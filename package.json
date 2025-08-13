@@ -9,11 +9,13 @@
     "build": "vite build"
   },
   "dependencies": {
+    "cross-env": "^7.0.3",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
-    "react-dom": "^19.1.0",
+    "mongoose": "^8.17.1",
     "react": "^19.1.0",
-    "vite-express": "*",
-    "cross-env": "^7.0.3"
+    "react-dom": "^19.1.0",
+    "vite-express": "*"
   },
   "devDependencies": {
     "@types/react": "^19.1.2",
