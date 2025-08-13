@@ -16,7 +16,9 @@ mongoose.connect(MONGO_URI)
 app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
 });
-
+app.get("/", (req, res) => {
+  res.send("The server is running");
+});
 ViteExpress.listen(app, 3000, () =>
   console.log("Server is listening on port 3000..."),
 );
