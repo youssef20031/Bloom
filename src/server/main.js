@@ -3,7 +3,6 @@ import ViteExpress from "vite-express";
 import mongoose from "mongoose";
 import dotenv from 'dotenv';
 import user from "./routes/user.js";
-import userRoutes from './routes/user.js';
 import serviceRoutes from './routes/service.js';
 import productRoutes from './routes/product.js';
 import datacenterRoutes from'./routes/datacenter.js'
@@ -36,8 +35,6 @@ app.use("/api/users", user);
 ViteExpress.listen(app, 3000, () =>
   console.log("Server is listening on port 3000..."),
 );
-app.use(express.json());
-app.use('/api/user', userRoutes);
 app.use('/api/service', serviceRoutes);
 app.use('/api/product', productRoutes);
 app.use('/api/datacenter',datacenterRoutes);
