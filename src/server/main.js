@@ -2,6 +2,7 @@ import express from "express";
 import ViteExpress from "vite-express";
 import mongoose from "mongoose";
 import dotenv from 'dotenv';
+import user from "./routes/user.js";
 import userRoutes from './routes/user.js';
 import serviceRoutes from './routes/service.js';
 import productRoutes from './routes/product.js';
@@ -23,6 +24,15 @@ app.get("/hello", (req, res) => {
 app.get("/", (req, res) => {
   res.send("The server is running");
 });
+// Middleware to parse JSON requests
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Add this line
+
+
+// User routes
+app.use("/api/users", user);
+
+
 ViteExpress.listen(app, 3000, () =>
   console.log("Server is listening on port 3000..."),
 );

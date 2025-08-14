@@ -22,5 +22,8 @@ router.put('/:id', userController.updateUser);
 // Delete a user by id
 router.delete('/:id', userController.deleteUser);
 
+// Get user by email
+router.get('/email/:email', userController.getUserByEmail);
+
 export default router;
 
