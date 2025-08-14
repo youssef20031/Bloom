@@ -8,6 +8,8 @@ import datacenterRoutes from'./routes/datacenter.js'
 import alertsRoutes from './routes/alerts.js'
 import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
+import customerRoutes from './routes/customer.js';
+import { populateDemoData } from './demo-data.js';
 
 dotenv.config();
 
@@ -21,6 +23,20 @@ mongoose.connect(MONGO_URI)
 
 app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
+});
+
+// Demo data population endpoint
+app.post("/api/demo/populate", async (req, res) => {
+  try {
+    const userId = await populateDemoData();
+    res.json({ 
+      message: "Demo data populated successfully", 
+      userId: userId.toString() 
+    });
+  } catch (error) {
+    console.error("Error populating demo data:", error);
+    res.status(500).json({ message: "Failed to populate demo data" });
+  }
 });
 
 // Middleware to parse JSON requests
@@ -45,6 +61,9 @@ app.use('/api/datacenter',datacenterRoutes);
 
 // Alerts routes
 app.use('/api/alerts',alertsRoutes);
+
+// Customer routes
+app.use('/api/customer', customerRoutes);
 
 ViteExpress.listen(app, 3000, () =>
   console.log("Server is listening on port 3000..."),

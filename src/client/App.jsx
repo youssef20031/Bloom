@@ -1,32 +1,93 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import reactLogo from "./assets/react.svg";
 import "./App.css";
+import CustomerDashboard from "./components/CustomerDashboard.jsx";
 
 function App() {
-  const [count, setCount] = useState(0);
+  const [currentView, setCurrentView] = useState('dashboard');
+  const [userId, setUserId] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch demo user ID on component mount
+  useEffect(() => {
+    const fetchDemoUserId = async () => {
+      try {
+        const response = await fetch('/api/demo/populate', { method: 'POST' });
+        if (response.ok) {
+          const data = await response.json();
+          setUserId(data.userId);
+        } else {
+          console.error('Failed to populate demo data');
+        }
+      } catch (error) {
+        console.error('Error fetching demo user ID:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDemoUserId();
+  }, []);
+
+  const renderContent = () => {
+    if (loading) {
+      return (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '50vh',
+          fontSize: '1.2rem',
+          color: '#6b7280'
+        }}>
+          Setting up demo data...
+        </div>
+      );
+    }
+
+    if (!userId) {
+      return (
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          height: '50vh',
+          fontSize: '1.2rem',
+          color: '#dc2626'
+        }}>
+          Failed to load demo data. Please check your MongoDB connection.
+        </div>
+      );
+    }
+
+    switch (currentView) {
+      case 'dashboard':
+        return <CustomerDashboard userId={userId} />;
+      default:
+        return <CustomerDashboard userId={userId} />;
+    }
+  };
 
   return (
     <div className="App">
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src="/vite.svg" className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://reactjs.org" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.jsx</code> and save to test HMR!
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
+      <nav className="app-nav">
+        <div className="nav-brand">
+          <img src={reactLogo} className="nav-logo" alt="Bloom Logo" />
+          <h1>Bloom Services</h1>
+        </div>
+        <div className="nav-menu">
+          <button 
+            className={`nav-btn ${currentView === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setCurrentView('dashboard')}
+          >
+            Dashboard
+          </button>
+        </div>
+      </nav>
+      
+      <main className="app-main">
+        {renderContent()}
+      </main>
     </div>
   );
 }
