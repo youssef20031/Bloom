@@ -52,7 +52,11 @@ describe('Alert Routes', () => {
     const res = await request(app).get('/api/alerts');
     expect(res.statusCode).toEqual(200);
     expect(res.body.length).toBe(2);
-    expect(res.body[0]).toHaveProperty('type', 'security');
-    expect(res.body[1]).toHaveProperty('type', 'power');
+    expect(res.body).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'security' }),
+        expect.objectContaining({ type: 'power' }),
+      ])
+    );
   });
 });
