@@ -59,4 +59,36 @@ export const deleteUser = async (req, res) => {
     res.status(500).send(error);
   }
 };
+// Get users by the role 
+export const getUsersByRole = async (req, res) => {
+  try {
+    const { role } = req.params;
 
+    // Validate role
+    const allowedRoles = ['customer', 'admin', 'presales', 'support', 'it'];
+    if (!allowedRoles.includes(role)) {
+      return res.status(400).json({ message: `Invalid role: ${role}` });
+    }
+
+    const users = await User.find({ role });
+
+    res.status(200).json(users);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+// Search for users
+export const searchUsers = async (req, res) => {
+  try {
+    const  query  = req.query.name;
+    if (!query) return res.status(400).json({ message: "Query is required" });
+
+    const users = await User.find({
+      name: { $regex: query, $options: "i" } // case-insensitive search
+    });
+
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
