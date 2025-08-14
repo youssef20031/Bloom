@@ -60,3 +60,18 @@ export const deleteProduct = async (req, res) => {
   }
 };
 
+// Search products by name
+export const searchProducts = async (req, res) => {
+    try {
+        const  query  = req.query.name;
+        if (!query) return res.status(400).json({ message: "Query is required" });
+
+        const products = await Product.find({
+            name: { $regex: query, $options: "i" }
+        });
+
+        res.json(products);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+};
