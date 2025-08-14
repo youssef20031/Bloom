@@ -3,6 +3,8 @@ import ViteExpress from "vite-express";
 import mongoose from "mongoose";
 import dotenv from 'dotenv';
 import user from "./routes/user.js";
+import invoiceRoutes from './routes/invoice.js';
+import productRoutes from './routes/product.js';
 
 dotenv.config();
 
@@ -25,6 +27,12 @@ app.use(express.urlencoded({ extended: true })); // Add this line
 
 // User routes
 app.use("/api/users", user);
+
+// Invoice routes
+app.use('/api/invoices', invoiceRoutes);
+
+// Product routes
+app.use('/api/products', productRoutes);
 
 
 ViteExpress.listen(app, 3000, () =>
