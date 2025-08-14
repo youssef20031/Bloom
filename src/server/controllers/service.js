@@ -1,5 +1,5 @@
-import Service from '../models/Service.js';
-import Product from '../models/Product.js';
+import Service from '../models/service.js';
+import Product from '../models/product.js';
 
 export const createService = async (req, res) => {
   try {
