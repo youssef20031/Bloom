@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import Customer from '../models/customer.js';
 import Service from '../models/service.js';
 import User from '../models/user.js';
@@ -6,7 +7,11 @@ import User from '../models/user.js';
 export const getCustomerDashboard = async (req, res) => {
   try {
     const { userId } = req.params;
-    
+
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID format' });
+    }
+
     // Find customer by userId
     const customer = await Customer.findOne({ userId }).populate('purchasedServices.serviceId');
     

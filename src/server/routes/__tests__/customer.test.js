@@ -131,6 +131,14 @@ describe('Customer Routes', () => {
       expect(res.body.message).toBe('Customer not found');
     });
 
+    it('should return 400 for invalid user ID format', async () => {
+      const res = await request(app)
+        .get(`/api/customer/dashboard/invalid-id`);
+
+      expect(res.statusCode).toEqual(400);
+      expect(res.body.message).toBe('Invalid user ID format');
+    });
+
     it('should handle customer with no purchased services', async () => {
       // Create a new user for this test to avoid conflicts
       const newUser = await User.create({
@@ -317,7 +325,8 @@ describe('Customer Routes', () => {
       const res = await request(app)
         .get('/api/customer/dashboard/invalid-id');
 
-      expect(res.statusCode).toEqual(500);
+      expect(res.statusCode).toEqual(400);
+      expect(res.body.message).toBe('Invalid user ID format');
     });
 
     it('should handle database connection errors gracefully', async () => {
@@ -326,8 +335,8 @@ describe('Customer Routes', () => {
       const res = await request(app)
         .get('/api/customer/dashboard/invalid-id');
       
-      expect(res.statusCode).toEqual(500);
-      expect(res.body.message).toBe('Internal server error');
+      expect(res.statusCode).toEqual(400);
+      expect(res.body.message).toBe('Invalid user ID format');
     });
   });
-}); 
+});
