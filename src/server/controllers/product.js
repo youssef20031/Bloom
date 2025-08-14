@@ -1,79 +1,77 @@
-import Product from '../models/Product.js';
-export const createProduct = async (req, res) => {
-  try {
-    const product = new Product(req.body);
-    await product.save();
-    res.status(201).send(product);
-  } catch (error) {
-    res.status(400).send(error);
-  }
-};
+import Product from '../models/product.js';
 
-// Get All Products
+// Get all products
 export const getAllProducts = async (req, res) => {
   try {
-    const products = await Product.find({});
-    res.send(products);
+    const products = await Product.find();
+    res.status(200).json(products);
   } catch (error) {
-    res.status(500).send(error);
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Get Product By ID
+// Get product by ID
 export const getProductById = async (req, res) => {
   try {
     const product = await Product.findById(req.params.id);
     if (!product) {
-      return res.status(404).send();
+      return res.status(404).json({ message: 'Product not found' });
     }
-    res.send(product);
+    res.status(200).json(product);
   } catch (error) {
-    res.status(500).send(error);
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Update Product
+// Create a new product
+export const createProduct = async (req, res) => {
+  const product = new Product(req.body);
+  try {
+    const newProduct = await product.save();
+    res.status(201).json(newProduct);
+  } catch (error) {
+    res.status(400).json({ message: error.message });
+  }
+};
+
+// Update a product
 export const updateProduct = async (req, res) => {
   try {
-    const product = await Product.findByIdAndUpdate(
-      req.params.id,
-      req.body,
-      { new: true, runValidators: true }
-    );
+    const product = await Product.findByIdAndUpdate(req.params.id, req.body, { new: true });
     if (!product) {
-      return res.status(404).send();
+      return res.status(404).json({ message: 'Product not found' });
     }
-    res.send(product);
+    res.status(200).json(product);
   } catch (error) {
-    res.status(400).send(error);
+    res.status(400).json({ message: error.message });
   }
 };
 
-// Delete Product
+// Delete a product
 export const deleteProduct = async (req, res) => {
   try {
     const product = await Product.findByIdAndDelete(req.params.id);
     if (!product) {
-      return res.status(404).send();
+      return res.status(404).json({ message: 'Product not found' });
     }
-    res.send(product);
+    res.status(200).json({ message: 'Product deleted successfully' });
   } catch (error) {
-    res.status(500).send(error);
+    res.status(500).json({ message: error.message });
   }
 };
 
-// Search Products
+// Search products by name
 export const searchProducts = async (req, res) => {
-  try {
-    const  query  = req.query.name;
-    if (!query) return res.status(400).json({ message: "Query is required" });
+    try {
+        const  query  = req.query.name;
+        if (!query) return res.status(400).json({ message: "Query is required" });
 
-    const products = await Product.find({
-      name: { $regex: query, $options: "i" }
-    });
+        const products = await Product.find({
+            name: { $regex: query, $options: "i" }
+        });
 
-    res.json(products);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+        res.json(products);
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
 };
