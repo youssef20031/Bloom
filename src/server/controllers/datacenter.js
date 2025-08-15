@@ -1,5 +1,6 @@
 import Datacenter from '../models/datacenter.js';
 import Alert from '../models/alerts.js';
+import { io } from '../main.js';
 // Create a new datacenter asset
 export const createDatacenterAsset = async (req, res) => {
   try {
@@ -29,33 +30,36 @@ export const addIotReading = async (req, res) => {
 
     // 2. Check thresholds
     if (temperature > 30) {
-      await Alert.create({
+      const alert = await Alert.create({
         datacenterId: datacenter._id,
         type: 'temperature',
         severity: 'critical',
         message: `Temperature exceeded 30°C (current: ${temperature}°C)`,
         status: 'new'
       });
+      io.emit('new-alert', alert);
     }
 
     if (humidity > 70) {
-      await Alert.create({
+      const alert2 = await Alert.create({
         datacenterId: datacenter._id,
         type: 'humidity',
         severity: 'warning',
         message: `Humidity exceeded 70% (current: ${humidity}%)`,
         status: 'new'
       });
+      io.emit('new-alert', alert2);
     }
 
     if (powerDraw > 1000) {
-      await Alert.create({
+      const alert3=await Alert.create({
         datacenterId: datacenter._id,
         type: 'power',
         severity: 'warning',
         message: `Power draw exceeded 1000W (current: ${powerDraw}W)`,
         status: 'new'
       });
+      io.emit('new-alert', alert3);
     }
 
     res.status(200).send({ message: 'Reading added and alerts checked', datacenter });
