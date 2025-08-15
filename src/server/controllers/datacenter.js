@@ -81,3 +81,15 @@ export const getAllAssetsWithLatestReading = async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 };
+// Get datacenter by id
+export const getDataCenterById = async (req, res) => {
+  try {
+    const dataCenter = await Datacenter.findById(req.params.id);
+    if (!dataCenter) {
+      return res.status(404).json({ message: 'Data center not found' });
+    }
+    res.status(200).json(dataCenter);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
