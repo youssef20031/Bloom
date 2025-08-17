@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "nodemon src/server/main.js -w src/server",
     "start": "cross-env NODE_ENV=production node src/server/main.js",
-    "build": "vite build"
+    "build": "vite build",
+    "setup-demo": "node src/server/setupDemoData.js"
   },
   "dependencies": {
     "cross-env": "^7.0.3",
