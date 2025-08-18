@@ -2,6 +2,10 @@ import express from 'express';
 import * as customerController from '../controllers/customer.js';
 
 const router = express.Router();
+
+// Authentication routes
+router.post('/register', customerController.register);
+router.post('/login', customerController.login);
 router.post('/signup', customerController.signupCustomer);
 // Customer profile routes
 router.get('/profile/:userId', customerController.getCustomerProfile);
