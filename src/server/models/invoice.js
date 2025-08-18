@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const invoiceSchema = new mongoose.Schema({
-  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
+  customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   invoiceNumber: { type: String, required: true },
   amount: { type: Number, required: true },
   status: { type: String, enum: ['paid', 'unpaid', 'overdue'], required: true },
@@ -20,4 +20,3 @@ const invoiceSchema = new mongoose.Schema({
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 
 export default Invoice;
-
