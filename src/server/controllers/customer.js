@@ -175,3 +175,38 @@ export const addTicketMessage = async (req, res) => {
 };
 
 
+export const signupCustomer = async (req, res) => {
+  try {
+    const { name, email, password, companyName, contactPerson, phone, address,  } = req.body;
+
+    // 1. Create the user
+    const user = new User({
+      name,
+      email,
+      password, // TODO: hash before saving
+      role: 'customer'
+    });
+    await user.save();
+
+    // 2. Create the customer linked to the user
+    const customer = new Customer({
+      userId: user._id,
+      companyName,
+      contactPerson,
+      phone,
+      address
+    });
+    await customer.save();
+
+    res.status(201).json({
+      message: 'Customer registered successfully',
+      user,
+      customer
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+};
+
+
+

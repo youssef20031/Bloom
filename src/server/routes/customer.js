@@ -2,7 +2,7 @@ import express from 'express';
 import * as customerController from '../controllers/customer.js';
 
 const router = express.Router();
-
+router.post('/signup', customerController.signupCustomer);
 // Customer profile routes
 router.get('/profile/:userId', customerController.getCustomerProfile);
 
