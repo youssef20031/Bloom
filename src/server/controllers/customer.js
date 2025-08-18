@@ -2,6 +2,7 @@ import express from 'express';
 import Customer from '../models/customer.js';
 import SupportTicket from '../models/supportTicket.js';
 import User from '../models/user.js';
+import Product from '../models/product.js';
 
 // Get customer profile by userId
 export const getCustomerProfile = async (req, res) => {
@@ -19,6 +20,41 @@ export const getCustomerProfile = async (req, res) => {
     res.json(customer);
   } catch (error) {
     console.error('Error fetching customer profile:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get all customers with their purchased products
+export const getAllCustomersWithPurchases = async (req, res) => {
+  try {
+    const customers = await Customer.find()
+      .populate('purchasedProducts.productId', 'name description price type model vendor')
+      .populate('userId', 'email firstName lastName')
+      .sort({ companyName: 1 });
+    
+    res.json(customers);
+  } catch (error) {
+    console.error('Error fetching customers with purchases:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get specific customer with their purchased products
+export const getCustomerWithPurchases = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    
+    const customer = await Customer.findById(customerId)
+      .populate('purchasedProducts.productId', 'name description price type model vendor')
+      .populate('userId', 'email firstName lastName');
+    
+    if (!customer) {
+      return res.status(404).json({ message: 'Customer not found' });
+    }
+    
+    res.json(customer);
+  } catch (error) {
+    console.error('Error fetching customer with purchases:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
@@ -137,3 +173,5 @@ export const addTicketMessage = async (req, res) => {
     res.status(500).json({ message: 'Internal server error' });
   }
 };
+
+

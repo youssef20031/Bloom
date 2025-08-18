@@ -1,13 +1,12 @@
 import mongoose from 'mongoose';
 import Product from './models/product.js';
-import ProductAllocation from './models/productAllocation.js';
 import Customer from './models/customer.js';
 import Service from './models/service.js';
 
-const setupHardwareDemoData = async () => {
+const setupProductDemoData = async () => {
   try {
-    // Sample hardware product data
-    const hardwareProductData = [
+    // Sample product data
+    const productData = [
       {
         serialNumber: 'SRV-001-2024',
         name: 'Production Server Alpha',
@@ -110,68 +109,51 @@ const setupHardwareDemoData = async () => {
       }
     ];
 
-    // Insert hardware products
-    const hardwareProducts = await Product.insertMany(hardwareProductData);
-    console.log(`Inserted ${hardwareProducts.length} hardware products`);
+    // Insert products
+    const products = await Product.insertMany(productData);
+    console.log(`Inserted ${products.length} products`);
 
-    // Get existing customers and services for allocation
+    // Get existing customers
     const customers = await Customer.find().limit(2);
-    const services = await Service.find().limit(2);
 
-    if (customers.length > 0 && services.length > 0 && hardwareProducts.length > 0) {
-      // Create some allocations
-      const allocationData = [
-        {
-          customerId: customers[0]._id,
-          productId: hardwareProducts[0]._id, // Server
-          serviceId: services[0]._id,
-          allocationType: 'dedicated',
-          usageDetails: {
-            purpose: 'Production web hosting',
-            workload: 'High-traffic web applications',
-            performanceRequirements: '99.9% uptime, low latency'
-          },
-          billing: {
-            rate: 500,
-            billingCycle: 'monthly',
-            lastBilled: new Date()
-          },
-          notes: 'Allocated for production environment'
-        },
-        {
-          customerId: customers[1]?._id || customers[0]._id,
-          productId: hardwareProducts[1]._id, // GPU
-          serviceId: services[1]?._id || services[0]._id,
-          allocationType: 'dedicated',
-          usageDetails: {
-            purpose: 'AI model training',
-            workload: 'Deep learning workloads',
-            performanceRequirements: 'High GPU utilization, batch processing'
-          },
-          billing: {
-            rate: 800,
-            billingCycle: 'monthly',
-            lastBilled: new Date()
-          },
-          notes: 'Allocated for AI training workloads'
-        }
-      ];
-
-      const allocations = await ProductAllocation.insertMany(allocationData);
-      console.log(`Created ${allocations.length} product allocations`);
-
-      // Update product status to allocated
-      await Product.updateMany(
-        { _id: { $in: [hardwareProducts[0]._id, hardwareProducts[1]._id] } },
-        { status: 'allocated' }
-      );
-      console.log('Updated product status for allocated pieces');
+    if (customers.length > 0 && products.length > 0) {
+      // Add purchased products to customers
+      const customer1 = customers[0];
+      const customer2 = customers[1] || customers[0];
+      
+      // Add server as purchased product to first customer
+      customer1.purchasedProducts.push({
+        productId: products[0]._id, // Server
+        purchaseDate: new Date('2024-01-15'),
+        status: 'active',
+        quantity: 1
+      });
+      
+      // Add GPU as purchased product to second customer
+      customer2.purchasedProducts.push({
+        productId: products[1]._id, // GPU
+        purchaseDate: new Date('2024-02-01'),
+        status: 'active',
+        quantity: 2
+      });
+      
+      // Add storage as purchased product to first customer
+      customer1.purchasedProducts.push({
+        productId: products[2]._id, // Storage
+        purchaseDate: new Date('2024-01-20'),
+        status: 'active',
+        quantity: 1
+      });
+      
+      await customer1.save();
+      await customer2.save();
+      console.log('Added purchased products to customers');
     }
 
-    console.log('Hardware product demo data setup completed successfully!');
+    console.log('Product demo data setup completed successfully!');
   } catch (error) {
-    console.error('Error setting up hardware product demo data:', error);
+    console.error('Error setting up product demo data:', error);
   }
 };
 
-export default setupHardwareDemoData;
+export default setupProductDemoData;

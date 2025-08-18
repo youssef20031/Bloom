@@ -9,7 +9,7 @@ import alertsRoutes from './routes/alerts.js'
 import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import customerRoutes from "./routes/customer.js";
-import productAllocationRoutes from "./routes/productAllocation.js";
+
 dotenv.config();
 
 const app = express();
@@ -21,7 +21,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/customers", customerRoutes);
 app.use("/api/users", userRoutes);
-app.use("/api/product-allocation", productAllocationRoutes);
+
 
 app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
