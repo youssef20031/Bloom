@@ -16,14 +16,24 @@ import customerRoutes from "./routes/customer.js";
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Change to frontend origin for security
+  }
+});
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/customers", customerRoutes);
-
+setIo(io);
+const MONGO_URI = process.env.MONGO_URI;
+mongoose.connect(MONGO_URI)
+  .then(() => console.log("Successfully connected to MongoDB"))
+  .catch(err => console.error("MongoDB connection error:", err));
 
 app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
