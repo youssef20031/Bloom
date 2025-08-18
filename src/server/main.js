@@ -12,6 +12,7 @@ import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
+import revenueReportRoutes from './routes/revenueReport.js';
 
 dotenv.config();
 
@@ -61,6 +62,9 @@ app.use('/api/datacenter',datacenterRoutes);
 
 // Alerts routes
 app.use('/api/alerts',alertsRoutes);
+
+// Revenue report routes
+app.use('/api/revenue-report', revenueReportRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
