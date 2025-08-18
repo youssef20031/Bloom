@@ -1,51 +1,42 @@
-# Hardware Management API Documentation
+# Product Allocation API Documentation
 
-This API provides comprehensive hardware tracking and allocation management for IT teams to monitor which customer is using which specific piece of hardware.
+This API provides comprehensive product tracking and allocation management for IT teams to monitor which customer is using which specific product (including hardware).
 
 ## Overview
 
-The Hardware Management System consists of two main models:
-- **Hardware**: Individual pieces of hardware with detailed specifications
-- **HardwareAllocation**: Tracks customer-hardware relationships and usage
+The Product Allocation System integrates with your existing Product model and adds:
+- **Enhanced Product Model**: Hardware tracking capabilities within your existing products
+- **ProductAllocation**: Tracks customer-product relationships and usage
 
 ## API Endpoints
 
 ### Base URL
 ```
-/api/hardware
+/api/product-allocation
 ```
 
-### 1. Hardware Management
+### 1. Product Allocation Management
 
-#### Create Hardware
+#### Allocate Product to Customer
 ```http
-POST /api/hardware/hardware
+POST /api/product-allocation/allocate
 ```
 **Body:**
 ```json
 {
-  "serialNumber": "SRV-001-2024",
-  "name": "Production Server Alpha",
-  "type": "server",
-  "model": "Dell PowerEdge R750",
-  "vendor": "Dell",
-  "specifications": {
-    "cpu": "Intel Xeon Gold 6338 (32 cores)",
-    "ram": "128GB DDR4 ECC",
-    "storage": "2TB NVMe SSD + 4TB HDD",
-    "network": "10GbE Dual Port",
-    "power": "750W Platinum",
-    "dimensions": "2U Rack Mount"
+  "customerId": "customer_id_here",
+  "productId": "product_id_here",
+  "serviceId": "service_id_here",
+  "allocationType": "dedicated",
+  "usageDetails": {
+    "purpose": "Production web hosting",
+    "workload": "High-traffic web applications",
+    "performanceRequirements": "99.9% uptime, low latency"
   },
-  "location": {
-    "datacenter": "DC-East-01",
-    "rack": "Rack-A-15",
-    "position": "U15-U16"
-  },
-  "purchaseDate": "2024-01-15",
-  "warrantyExpiry": "2027-01-15",
-  "nextMaintenance": "2024-07-15",
-  "tags": ["production", "high-performance", "enterprise"]
+  "billing": {
+    "rate": 500,
+    "billingCycle": "monthly"
+  }
 }
 ```
 

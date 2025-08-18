@@ -1,14 +1,14 @@
 import mongoose from 'mongoose';
 
-const hardwareAllocationSchema = new mongoose.Schema({
+const productAllocationSchema = new mongoose.Schema({
   customerId: { 
     type: mongoose.Schema.Types.ObjectId, 
     ref: 'Customer', 
     required: true 
   },
-  hardwareId: { 
+  productId: { 
     type: mongoose.Schema.Types.ObjectId, 
-    ref: 'Hardware', 
+    ref: 'Product', 
     required: true 
   },
   serviceId: { 
@@ -58,14 +58,14 @@ const hardwareAllocationSchema = new mongoose.Schema({
 });
 
 // Indexes for efficient queries
-hardwareAllocationSchema.index({ customerId: 1, status: 1 });
-hardwareAllocationSchema.index({ hardwareId: 1, status: 1 });
-hardwareAllocationSchema.index({ allocationDate: 1 });
-hardwareAllocationSchema.index({ status: 1 });
+productAllocationSchema.index({ customerId: 1, status: 1 });
+productAllocationSchema.index({ productId: 1, status: 1 });
+productAllocationSchema.index({ allocationDate: 1 });
+productAllocationSchema.index({ status: 1 });
 
-// Ensure one active allocation per hardware piece
-hardwareAllocationSchema.index({ hardwareId: 1, status: 1 }, { unique: true, partialFilterExpression: { status: 'active' } });
+// Ensure one active allocation per product (for hardware products)
+productAllocationSchema.index({ productId: 1, status: 1 }, { unique: true, partialFilterExpression: { status: 'active' } });
 
-const HardwareAllocation = mongoose.model('HardwareAllocation', hardwareAllocationSchema);
+const ProductAllocation = mongoose.model('ProductAllocation', productAllocationSchema);
 
-export default HardwareAllocation;
+export default ProductAllocation;

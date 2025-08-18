@@ -1,13 +1,13 @@
 import mongoose from 'mongoose';
-import Hardware from './models/hardware.js';
-import HardwareAllocation from './models/hardwareAllocation.js';
+import Product from './models/product.js';
+import ProductAllocation from './models/productAllocation.js';
 import Customer from './models/customer.js';
 import Service from './models/service.js';
 
 const setupHardwareDemoData = async () => {
   try {
-    // Sample hardware data
-    const hardwareData = [
+    // Sample hardware product data
+    const hardwareProductData = [
       {
         serialNumber: 'SRV-001-2024',
         name: 'Production Server Alpha',
@@ -110,20 +110,20 @@ const setupHardwareDemoData = async () => {
       }
     ];
 
-    // Insert hardware
-    const hardware = await Hardware.insertMany(hardwareData);
-    console.log(`Inserted ${hardware.length} hardware pieces`);
+    // Insert hardware products
+    const hardwareProducts = await Product.insertMany(hardwareProductData);
+    console.log(`Inserted ${hardwareProducts.length} hardware products`);
 
     // Get existing customers and services for allocation
     const customers = await Customer.find().limit(2);
     const services = await Service.find().limit(2);
 
-    if (customers.length > 0 && services.length > 0 && hardware.length > 0) {
+    if (customers.length > 0 && services.length > 0 && hardwareProducts.length > 0) {
       // Create some allocations
       const allocationData = [
         {
           customerId: customers[0]._id,
-          hardwareId: hardware[0]._id, // Server
+          productId: hardwareProducts[0]._id, // Server
           serviceId: services[0]._id,
           allocationType: 'dedicated',
           usageDetails: {
@@ -140,7 +140,7 @@ const setupHardwareDemoData = async () => {
         },
         {
           customerId: customers[1]?._id || customers[0]._id,
-          hardwareId: hardware[1]._id, // GPU
+          productId: hardwareProducts[1]._id, // GPU
           serviceId: services[1]?._id || services[0]._id,
           allocationType: 'dedicated',
           usageDetails: {
@@ -157,20 +157,20 @@ const setupHardwareDemoData = async () => {
         }
       ];
 
-      const allocations = await HardwareAllocation.insertMany(allocationData);
-      console.log(`Created ${allocations.length} hardware allocations`);
+      const allocations = await ProductAllocation.insertMany(allocationData);
+      console.log(`Created ${allocations.length} product allocations`);
 
-      // Update hardware status to allocated
-      await Hardware.updateMany(
-        { _id: { $in: [hardware[0]._id, hardware[1]._id] } },
+      // Update product status to allocated
+      await Product.updateMany(
+        { _id: { $in: [hardwareProducts[0]._id, hardwareProducts[1]._id] } },
         { status: 'allocated' }
       );
-      console.log('Updated hardware status for allocated pieces');
+      console.log('Updated product status for allocated pieces');
     }
 
-    console.log('Hardware demo data setup completed successfully!');
+    console.log('Hardware product demo data setup completed successfully!');
   } catch (error) {
-    console.error('Error setting up hardware demo data:', error);
+    console.error('Error setting up hardware product demo data:', error);
   }
 };
 
