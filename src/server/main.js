@@ -10,6 +10,7 @@ import datacenterRoutes from'./routes/datacenter.js'
 import alertsRoutes from './routes/alerts.js'
 import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
+import { setIo } from './socket.js';
 
 dotenv.config();
 
@@ -21,6 +22,8 @@ const io = new Server(server, {
     origin: "*", // Change to frontend origin for security
   }
 });
+setIo(io);
+
 // MongoDB Connection
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
@@ -62,8 +65,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// ✅ Export io so controllers can emit events
-export { io };
 ViteExpress.bind(app, server);
 
 // Listen on one port for both API + WebSocket
