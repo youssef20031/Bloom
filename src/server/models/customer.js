@@ -17,6 +17,14 @@ const customerSchema = new mongoose.Schema({
       status: { type: String, enum: ['active', 'expired'] },
       ipAddress: { type: String }
     }
+  ],
+  purchasedProducts: [
+    {
+      productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Product' },
+      purchaseDate: { type: Date },
+      status: { type: String, enum: ['active', 'expired'] },
+      quantity: { type: Number, default: 1 }
+    }
   ]
 });
 

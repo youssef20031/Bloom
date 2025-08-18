@@ -11,6 +11,7 @@ import alertsRoutes from './routes/alerts.js'
 import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import { setIo } from './socket.js';
+import customerRoutes from "./routes/customer.js";
 
 dotenv.config();
 
@@ -22,9 +23,13 @@ const io = new Server(server, {
     origin: "*", // Change to frontend origin for security
   }
 });
-setIo(io);
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// MongoDB Connection
+// Routes
+app.use("/api/customers", customerRoutes);
+setIo(io);
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
   .then(() => console.log("Successfully connected to MongoDB"))
@@ -56,6 +61,13 @@ app.use('/api/datacenter',datacenterRoutes);
 
 // Alerts routes
 app.use('/api/alerts',alertsRoutes);
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
+});
+
 
 io.on("connection", (socket) => {
   console.log("🔌 Frontend connected to WebSocket");
