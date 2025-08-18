@@ -2,12 +2,15 @@ import express from "express";
 import ViteExpress from "vite-express";
 import mongoose from "mongoose";
 import dotenv from 'dotenv';
+import { Server } from "socket.io";  
+import http from "http";          
 import user from "./routes/user.js";
 import serviceRoutes from './routes/service.js';
 import datacenterRoutes from'./routes/datacenter.js'
 import alertsRoutes from './routes/alerts.js'
 import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
+import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
 
 dotenv.config();
@@ -20,7 +23,6 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/customers", customerRoutes);
-app.use("/api/users", userRoutes);
 
 
 app.get("/hello", (req, res) => {
@@ -56,6 +58,18 @@ app.use((err, req, res, next) => {
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
-ViteExpress.listen(app, 3000, () =>
-  console.log("Server is listening on port 3000..."),
-);
+
+io.on("connection", (socket) => {
+  console.log("🔌 Frontend connected to WebSocket");
+
+  socket.on("disconnect", () => {
+    console.log("❌ Frontend disconnected from WebSocket");
+  });
+});
+
+ViteExpress.bind(app, server);
+
+// Listen on one port for both API + WebSocket
+server.listen(3000, () => {
+  console.log("Server + WebSocket running on port 3000");
+});
