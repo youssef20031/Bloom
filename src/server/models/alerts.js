@@ -6,10 +6,10 @@ const alertSchema = new mongoose.Schema({
   severity: { type: String, enum: ['warning', 'critical'], required: true },
   message: { type: String, required: true },
   status: { type: String, enum: ['new', 'acknowledged', 'resolved'], default: 'new' },
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now },
+  read: { type: Boolean, default: false } // Added read field
 });
 
 const Alert = mongoose.model('Alert', alertSchema);
 
 export default Alert;
-

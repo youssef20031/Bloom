@@ -10,6 +10,7 @@
     "test": "jest"
   },
   "dependencies": {
+    "bcryptjs": "^3.0.2",
     "cross-env": "^7.0.3",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",

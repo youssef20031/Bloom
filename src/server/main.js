@@ -13,6 +13,7 @@ import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
+import supportTicketRoutes from './routes/supportTicket.js';
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/customers", customerRoutes);
+app.use("/api/support", supportTicketRoutes);
 setIo(io);
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
