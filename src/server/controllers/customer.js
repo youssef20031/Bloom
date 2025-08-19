@@ -1,80 +1,28 @@
-import mongoose from 'mongoose';
+import express from 'express';
+import bcrypt from 'bcryptjs';
 import Customer from '../models/customer.js';
-import Service from '../models/service.js';
+import SupportTicket from '../models/supportTicket.js';
 import User from '../models/user.js';
+import Product from '../models/product.js';
+import LoginAttempt from '../models/LoginAttempt.js';
+import { sendAlertEmail } from '../utils/alertService.js';
 
-// Get customer dashboard data (purchased services with details)
-export const getCustomerDashboard = async (req, res) => {
-  try {
-    const { userId } = req.params;
+// Helper to format user response
+const formatUserResponse = (user) => ({
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  role: user.role
+});
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID format' });
-    }
-
-    // Find customer by userId
-    const customer = await Customer.findOne({ userId }).populate('purchasedServices.serviceId');
-    
-    if (!customer) {
-      return res.status(404).json({ message: 'Customer not found' });
-    }
-
-    // Get detailed service information
-    const servicesWithDetails = await Promise.all(
-      customer.purchasedServices.map(async (purchasedService) => {
-        const service = await Service.findById(purchasedService.serviceId);
-        return {
-          id: purchasedService.serviceId._id,
-          name: service?.name || 'Unknown Service',
-          description: service?.description || '',
-          type: service?.type || 'unknown',
-          purchaseDate: purchasedService.purchaseDate,
-          status: purchasedService.status,
-          ipAddress: purchasedService.ipAddress,
-          datacenterLocation: service?.hostingDetails?.datacenterLocation || 'N/A',
-          vmSpecs: service?.hostingDetails?.vmSpecs || {}
-        };
-      })
-    );
-
-    res.json({
-      customer: {
-        companyName: customer.companyName,
-        contactPerson: customer.contactPerson,
-        phone: customer.phone,
-        address: customer.address
-      },
-      services: servicesWithDetails
-    });
-  } catch (error) {
-    console.error('Error fetching customer dashboard:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-// Get specific service details
-export const getServiceDetails = async (req, res) => {
-  try {
-    const { serviceId } = req.params;
-    const service = await Service.findById(serviceId);
-    
-    if (!service) {
-      return res.status(404).json({ message: 'Service not found' });
-    }
-    
-    res.json(service);
-  } catch (error) {
-    console.error('Error fetching service details:', error);
-    res.status(500).json({ message: 'Internal server error' });
-  }
-};
-
-// Get customer profile information
+// Get customer profile by userId
 export const getCustomerProfile = async (req, res) => {
   try {
     const { userId } = req.params;
     
-    const customer = await Customer.findOne({ userId }).select('-purchasedServices');
+    const customer = await Customer.findOne({ userId })
+      .populate('userId', 'email firstName lastName')
+      .populate('purchasedServices.serviceId', 'name description price');
     
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
@@ -87,21 +35,29 @@ export const getCustomerProfile = async (req, res) => {
   }
 };
 
-// Update customer profile
-export const updateCustomerProfile = async (req, res) => {
+// Get all customers with their purchased products
+export const getAllCustomersWithPurchases = async (req, res) => {
   try {
-    const { userId } = req.params;
-    const updateData = req.body;
+    const customers = await Customer.find()
+      .populate('purchasedProducts.productId', 'name description price type model vendor')
+      .populate('userId', 'email firstName lastName')
+      .sort({ companyName: 1 });
     
-    // Remove fields that shouldn't be updated
-    delete updateData.userId;
-    delete updateData.purchasedServices;
+    res.json(customers);
+  } catch (error) {
+    console.error('Error fetching customers with purchases:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get specific customer with their purchased products
+export const getCustomerWithPurchases = async (req, res) => {
+  try {
+    const { customerId } = req.params;
     
-    const customer = await Customer.findOneAndUpdate(
-      { userId },
-      updateData,
-      { new: true, runValidators: true }
-    );
+    const customer = await Customer.findById(customerId)
+      .populate('purchasedProducts.productId', 'name description price type model vendor')
+      .populate('userId', 'email firstName lastName');
     
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
@@ -109,35 +65,185 @@ export const updateCustomerProfile = async (req, res) => {
     
     res.json(customer);
   } catch (error) {
-    console.error('Error updating customer profile:', error);
+    console.error('Error fetching customer with purchases:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
 
-// Get customer service summary
-export const getCustomerServiceSummary = async (req, res) => {
+// Create a new support ticket
+export const createSupportTicket = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { customerId, issue, priority = 'medium' } = req.body;
     
-    const customer = await Customer.findOne({ userId });
+    // Validate required fields
+    if (!customerId || !issue) {
+      return res.status(400).json({ 
+        message: 'Customer ID and issue description are required' 
+      });
+    }
     
+    // Verify customer exists
+    const customer = await Customer.findById(customerId);
     if (!customer) {
       return res.status(404).json({ message: 'Customer not found' });
     }
     
-    const summary = {
-      totalServices: customer.purchasedServices.length,
-      activeServices: customer.purchasedServices.filter(service => service.status === 'active').length,
-      expiredServices: customer.purchasedServices.filter(service => service.status === 'expired').length,
-      totalSpent: 0, // This could be calculated from invoices if available
-      lastPurchase: customer.purchasedServices.length > 0 
-        ? Math.max(...customer.purchasedServices.map(s => new Date(s.purchaseDate)))
-        : null
-    };
+    // Create support ticket
+    const supportTicket = new SupportTicket({
+      customerId,
+      issue,
+      priority,
+      status: 'open',
+      history: [{
+        message: `Ticket created: ${issue}`,
+        author: customerId,
+        timestamp: new Date()
+      }]
+    });
     
-    res.json(summary);
+    await supportTicket.save();
+    
+    res.status(201).json({
+      message: 'Support ticket created successfully',
+      ticket: supportTicket
+    });
   } catch (error) {
-    console.error('Error fetching customer service summary:', error);
+    console.error('Error creating support ticket:', error);
     res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get customer's support tickets
+export const getCustomerTickets = async (req, res) => {
+  try {
+    const { customerId } = req.params;
+    
+    const tickets = await SupportTicket.find({ customerId })
+      .populate('supportAgentId', 'firstName lastName email')
+      .sort({ createdAt: -1 });
+    
+    res.json(tickets);
+  } catch (error) {
+    console.error('Error fetching customer tickets:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Get specific support ticket
+export const getSupportTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    
+    const ticket = await SupportTicket.findById(ticketId)
+      .populate('customerId', 'companyName contactPerson')
+      .populate('supportAgentId', 'firstName lastName email')
+      .populate('history.author', 'firstName lastName email');
+    
+    if (!ticket) {
+      return res.status(404).json({ message: 'Support ticket not found' });
+    }
+    
+    res.json(ticket);
+  } catch (error) {
+    console.error('Error fetching support ticket:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Add message to support ticket
+export const addTicketMessage = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { message, authorId } = req.body;
+    
+    if (!message || !authorId) {
+      return res.status(400).json({ 
+        message: 'Message and author ID are required' 
+      });
+    }
+    
+    const ticket = await SupportTicket.findById(ticketId);
+    if (!ticket) {
+      return res.status(404).json({ message: 'Support ticket not found' });
+    }
+    
+    ticket.history.push({
+      message,
+      author: authorId,
+      timestamp: new Date()
+    });
+    
+    await ticket.save();
+    
+    res.json({
+      message: 'Message added successfully',
+      ticket
+    });
+  } catch (error) {
+    console.error('Error adding message to ticket:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// Register a new customer
+export const register = async (req, res) => {
+  try {
+    const { name, email, password, role = 'customer' } = req.body;
+    if (!name || !email || !password) {
+      return res.status(400).json({ message: 'Missing fields' });
+    }
+
+    const exists = await Customer.findOne({ email });
+    if (exists) {
+      return res.status(409).json({ message: 'Email already in use' });
+    }
+
+    const passwordHash = await bcrypt.hash(password, 10);
+    const user = await Customer.create({ name, email, passwordHash, role });
+
+    res.status(201).json({ user: formatUserResponse(user) });
+  } catch (err) {
+    res.status(500).json({ message: 'Register failed', error: err.message });
+  }
+};
+
+// Login customer
+export const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    const forwarded = req.headers['x-forwarded-for'];
+    const ip = Array.isArray(forwarded)
+      ? forwarded[0]
+      : (forwarded?.split(',')[0] || req.socket.remoteAddress);
+
+    const user = await Customer.findOne({ email });
+    if (!user) {
+      await LoginAttempt.create({ email, ipAddress: ip, success: false });
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) {
+      await LoginAttempt.create({ email, ipAddress: ip, success: false });
+
+      const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+      const attempts = await LoginAttempt.countDocuments({
+        email,
+        success: false,
+        createdAt: { $gte: fifteenMinsAgo }
+      });
+
+      if (attempts >= 5) {
+        await sendAlertEmail({ email, ip, count: attempts });
+      }
+
+      return res.status(401).json({ message: 'Invalid credentials' });
+    }
+
+    await LoginAttempt.create({ email, ipAddress: ip, success: true });
+
+    res.json({ user: formatUserResponse(user) });
+  } catch (err) {
+    res.status(500).json({ message: 'Login failed', error: err.message });
   }
 };

@@ -2,20 +2,34 @@ import express from "express";
 import ViteExpress from "vite-express";
 import mongoose from "mongoose";
 import dotenv from 'dotenv';
+import { Server } from "socket.io";  
+import http from "http";          
 import user from "./routes/user.js";
 import serviceRoutes from './routes/service.js';
 import datacenterRoutes from'./routes/datacenter.js'
 import alertsRoutes from './routes/alerts.js'
 import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
-import customerRoutes from './routes/customer.js';
-import { populateDemoData } from './demo-data.js';
+import { setIo } from './socket.js';
+import customerRoutes from "./routes/customer.js";
 
 dotenv.config();
 
 const app = express();
+const server = http.createServer(app);
 
-// MongoDB Connection
+const io = new Server(server, {
+  cors: {
+    origin: "*", // Change to frontend origin for security
+  }
+});
+// Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
+app.use("/api/customers", customerRoutes);
+setIo(io);
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
   .then(() => console.log("Successfully connected to MongoDB"))
@@ -23,20 +37,6 @@ mongoose.connect(MONGO_URI)
 
 app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
-});
-
-// Demo data population endpoint
-app.post("/api/demo/populate", async (req, res) => {
-  try {
-    const userId = await populateDemoData();
-    res.json({ 
-      message: "Demo data populated successfully", 
-      userId: userId.toString() 
-    });
-  } catch (error) {
-    console.error("Error populating demo data:", error);
-    res.status(500).json({ message: "Failed to populate demo data" });
-  }
 });
 
 // Middleware to parse JSON requests
@@ -62,9 +62,24 @@ app.use('/api/datacenter',datacenterRoutes);
 // Alerts routes
 app.use('/api/alerts',alertsRoutes);
 
-// Customer routes
-app.use('/api/customer', customerRoutes);
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(500).json({ message: 'Something went wrong!' });
+});
 
-ViteExpress.listen(app, 3000, () =>
-  console.log("Server is listening on port 3000..."),
-);
+
+io.on("connection", (socket) => {
+  console.log("🔌 Frontend connected to WebSocket");
+
+  socket.on("disconnect", () => {
+    console.log("❌ Frontend disconnected from WebSocket");
+  });
+});
+
+ViteExpress.bind(app, server);
+
+// Listen on one port for both API + WebSocket
+server.listen(3000, () => {
+  console.log("Server + WebSocket running on port 3000");
+});

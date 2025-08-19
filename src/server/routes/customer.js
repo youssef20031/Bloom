@@ -1,19 +1,25 @@
 import express from 'express';
-import {
-  getCustomerDashboard,
-  getServiceDetails,
-  getCustomerProfile,
-  updateCustomerProfile,
-  getCustomerServiceSummary
-} from '../controllers/customer.js';
+import * as customerController from '../controllers/customer.js';
 
 const router = express.Router();
 
-// Customer dashboard routes
-router.get('/dashboard/:userId', getCustomerDashboard);
-router.get('/service/:serviceId', getServiceDetails);
-router.get('/profile/:userId', getCustomerProfile);
-router.put('/profile/:userId', updateCustomerProfile);
-router.get('/summary/:userId', getCustomerServiceSummary);
+// Authentication routes
+router.post('/register', customerController.register);
+router.post('/login', customerController.login);
 
-export default router; 
+// Customer profile routes
+router.get('/profile/:userId', customerController.getCustomerProfile);
+
+// Customer purchases routes
+router.get('/purchases/all', customerController.getAllCustomersWithPurchases);
+router.get('/purchases/:customerId', customerController.getCustomerWithPurchases);
+
+// Support ticket routes
+router.post('/tickets', customerController.createSupportTicket);
+router.get('/tickets/:customerId', customerController.getCustomerTickets);
+router.get('/tickets/detail/:ticketId', customerController.getSupportTicket);
+router.post('/tickets/:ticketId/message', customerController.addTicketMessage);
+
+
+
+export default router;
