@@ -4,6 +4,7 @@ import Customer from '../models/customer.js';
 import SupportTicket from '../models/supportTicket.js';
 import User from '../models/user.js';
 import Product from '../models/product.js';
+import Service from '../models/service.js';
 
 // Helper to format user response
 const formatUserResponse = (user) => ({
@@ -31,17 +32,11 @@ export const getCustomers = async (req, res) => {
 // Create a new customer
 export const createCustomer = async (req, res) => {
     try {
-        const { name, email, hostingStatus = 'inactive' } = req.body;
-        if (!name || !email) {
-            return res.status(400).json({ message: 'Name and email are required' });
+        const { userId, companyName, contactPerson, hostingStatus = 'inactive' } = req.body;
+        if (!userId || !companyName || !contactPerson) {
+            return res.status(400).json({ message: 'userId, companyName, and contactPerson are required' });
         }
-
-        const exists = await Customer.findOne({ email });
-        if (exists) {
-            return res.status(409).json({ message: 'Email already exists' });
-        }
-
-        const newCustomer = await Customer.create({ name, email, hostingStatus });
+        const newCustomer = await Customer.create({ userId, companyName, contactPerson, hostingStatus });
         res.status(201).json(newCustomer);
     } catch (err) {
         console.error('Error creating customer:', err);
@@ -53,11 +48,11 @@ export const createCustomer = async (req, res) => {
 export const updateCustomer = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, hostingStatus } = req.body;
+        const { companyName, contactPerson, hostingStatus } = req.body;
 
         const customer = await Customer.findByIdAndUpdate(
             id,
-            { $set: { name, email, hostingStatus } },
+            { $set: { companyName, contactPerson, hostingStatus } },
             { new: true }
         );
 
@@ -297,5 +292,3 @@ export const register = async (req, res) => {
         res.status(500).json({ message: 'Register failed', error: err.message });
     }
 };
-
-
