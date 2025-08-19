@@ -26,8 +26,7 @@ const customerSchema = new mongoose.Schema({
       status: { type: String, enum: ['active', 'expired'] },
       quantity: { type: Number, default: 1 }
     }
-  ],
-  hostingStatus: { type: String, default: 'inactive' }
+  ]
 });
 
 const Customer = mongoose.model('Customer', customerSchema);
