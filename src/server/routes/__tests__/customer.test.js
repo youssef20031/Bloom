@@ -1,4 +1,4 @@
-// filepath: d:\Bloom\src\server\routes\__tests__\customer.test.js
+// filepath: d:/Bloom/src/server/routes/__tests__/customer.test.js
 import request from 'supertest';
 import express from 'express';
 import mongoose from 'mongoose';
@@ -14,64 +14,77 @@ app.use('/api/customers', customerRoutes);
 let mongoServer;
 
 beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const uri = mongoServer.getUri();
-  await mongoose.connect(uri);
+    mongoServer = await MongoMemoryServer.create();
+    const uri = mongoServer.getUri();
+    await mongoose.connect(uri, {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+    });
 });
 
 afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
+    await mongoose.connection.dropDatabase();
+    await mongoose.connection.close();
+    await mongoServer.stop();
 });
 
 afterEach(async () => {
-  await Customer.deleteMany({});
+    await Customer.deleteMany({});
   await SupportTicket.deleteMany({});
 });
 
 describe('Customer API', () => {
-  it('should create a new customer', async () => {
-    const fakeUserId = new mongoose.Types.ObjectId();
-    const payload = { userId: fakeUserId.toString(), companyName: 'Test Company', contactPerson: 'Tester' };
-    const res = await request(app)
-      .post('/api/customers')
-      .send(payload);
-    expect(res.statusCode).toBe(201);
-    expect(res.body.companyName).toBe('Test Company');
-    expect(res.body.contactPerson).toBe('Tester');
-    expect(res.body.userId).toBe(fakeUserId.toString());
-  });
+    it('should create a new customer', async () => {
+        const fakeUserId = new mongoose.Types.ObjectId();
+        const payload = { userId: fakeUserId.toString(), companyName: 'Test Company', contactPerson: 'Tester' };
 
-  it('should get all customers', async () => {
-    const uid1 = new mongoose.Types.ObjectId();
-    const uid2 = new mongoose.Types.ObjectId();
-    await Customer.create({ userId: uid1, companyName: 'A Co', contactPerson: 'A' });
-    await Customer.create({ userId: uid2, companyName: 'B Co', contactPerson: 'B' });
+        const res = await request(app)
+            .post('/api/customers')
+            .send(payload);
 
-    const res = await request(app).get('/api/customers');
-    expect(res.statusCode).toBe(200);
-    expect(res.body.length).toBe(2);
-  });
+        expect(res.statusCode).toBe(201);
+        expect(res.body).toHaveProperty('_id');
+        expect(res.body.companyName).toBe('Test Company');
+        expect(res.body.contactPerson).toBe('Tester');
+        expect(res.body.userId).toBe(fakeUserId.toString());
+    });
 
-  it('should update a customer', async () => {
-    const uid = new mongoose.Types.ObjectId();
-    const customer = await Customer.create({ userId: uid, companyName: 'Old Co', contactPerson: 'Old' });
-    const newData = { companyName: 'New Co', contactPerson: 'New' };
-    const res = await request(app)
-      .put(`/api/customers/${customer._id}`)
-      .send(newData);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.companyName).toBe('New Co');
-    expect(res.body.contactPerson).toBe('New');
-  });
+    it('should get all customers', async () => {
+        const uid1 = new mongoose.Types.ObjectId();
+        const uid2 = new mongoose.Types.ObjectId();
+        await Customer.create({ userId: uid1.toString(), companyName: 'A Co', contactPerson: 'A' });
+        await Customer.create({ userId: uid2.toString(), companyName: 'B Co', contactPerson: 'B' });
 
-  it('should delete a customer', async () => {
-    const uid = new mongoose.Types.ObjectId();
-    const customer = await Customer.create({ userId: uid, companyName: 'Delete Co', contactPerson: 'Delete' });
-    const res = await request(app).delete(`/api/customers/${customer._id}`);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.message).toBe('Customer deleted');
-  });
+        const res = await request(app).get('/api/customers');
+
+        expect(res.statusCode).toBe(200);
+        expect(Array.isArray(res.body)).toBe(true);
+        expect(res.body.length).toBe(2);
+    });
+
+    it('should update a customer', async () => {
+        const uid = new mongoose.Types.ObjectId();
+        const customer = await Customer.create({ userId: uid.toString(), companyName: 'Old Co', contactPerson: 'Old' });
+
+        const newData = { companyName: 'New Co', contactPerson: 'New' };
+        const res = await request(app)
+            .put(`/api/customers/${customer._id}`)
+            .send(newData);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.companyName).toBe('New Co');
+        expect(res.body.contactPerson).toBe('New');
+    });
+
+    it('should delete a customer', async () => {
+        const uid = new mongoose.Types.ObjectId();
+        const customer = await Customer.create({ userId: uid.toString(), companyName: 'Delete Co', contactPerson: 'Delete' });
+
+        const res = await request(app).delete(`/api/customers/${customer._id}`);
+
+        expect(res.statusCode).toBe(200);
+        expect(res.body.message).toBe('Customer deleted');
+    });
 
   it('should update hosting status', async () => {
     const uid = new mongoose.Types.ObjectId();
@@ -132,24 +145,5 @@ describe('Customer API', () => {
       .send({ message: 'Follow up', authorId: customer._id.toString() });
     expect(msgRes.statusCode).toBe(200);
     expect(msgRes.body.ticket.history.some(h => h.message === 'Follow up')).toBe(true);
-  });
-
-  it('should register and login a user', async () => {
-    const email = 'test@example.com';
-    const password = 'password123';
-    const name = 'Test User';
-    const regRes = await request(app)
-      .post('/api/customers/register')
-      .send({ name, email, password });
-    expect(regRes.statusCode).toBe(201);
-    expect(regRes.body.user.name).toBe(name);
-    expect(regRes.body.user.email).toBe(email);
-    expect(regRes.body.user.role).toBe('customer');
-
-    const loginRes = await request(app)
-      .post('/api/customers/login')
-      .send({ email, password });
-    expect(loginRes.statusCode).toBe(200);
-    expect(loginRes.body.user.email).toBe(email);
   });
 });

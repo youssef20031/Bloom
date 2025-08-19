@@ -4,8 +4,6 @@ import Customer from '../models/customer.js';
 import SupportTicket from '../models/supportTicket.js';
 import User from '../models/user.js';
 import Product from '../models/product.js';
-import LoginAttempt from '../models/LoginAttempt.js';
-import { sendAlertEmail } from '../utils/alertService.js';
 
 // Helper to format user response
 const formatUserResponse = (user) => ({
@@ -260,63 +258,44 @@ export const addTicketMessage = async (req, res) => {
 };
 
 /* ===============================
-   AUTH
+   AUTH (Register only)
    =============================== */
 
 export const register = async (req, res) => {
     try {
-        const { name, email, password, role = 'customer' } = req.body;
-        if (!name || !email || !password) {
-            return res.status(400).json({ message: 'Missing fields' });
+        const { userId, name, email, password, role = 'customer' } = req.body;
+
+        if (!userId || !name || !email || !password) {
+            return res.status(400).json({ message: 'Missing fields (userId, name, email, password required)' });
         }
 
-        const exists = await Customer.findOne({ email });
+        // Check if customer already exists for this userId
+        const exists = await Customer.findOne({ userId });
         if (exists) {
-            return res.status(409).json({ message: 'Email already in use' });
+            return res.status(409).json({ message: 'Customer already registered with this user ID' });
+        }
+
+        // Make sure userId exists in User collection
+        const userExists = await User.findById(userId);
+        if (!userExists) {
+            return res.status(404).json({ message: 'User account not found' });
         }
 
         const passwordHash = await bcrypt.hash(password, 10);
-        const user = await Customer.create({ name, email, passwordHash, role });
 
-        res.status(201).json({ user: formatUserResponse(user) });
+        const customer = await Customer.create({
+            userId,
+            name,
+            email,
+            passwordHash,
+            role
+        });
+
+        res.status(201).json({ user: formatUserResponse(customer) });
     } catch (err) {
+        console.error('Error registering customer:', err);
         res.status(500).json({ message: 'Register failed', error: err.message });
     }
 };
 
-export const login = async (req, res) => {
-    try {
-        const { email, password } = req.body;
-        const forwarded = req.headers['x-forwarded-for'];
-        const ip = Array.isArray(forwarded) ? forwarded[0] : (forwarded?.split(',')[0] || req.socket.remoteAddress);
 
-        const user = await Customer.findOne({ email });
-        if (!user) {
-            await LoginAttempt.create({ email, ipAddress: ip, success: false });
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-
-        const ok = await bcrypt.compare(password, user.passwordHash);
-        if (!ok) {
-            await LoginAttempt.create({ email, ipAddress: ip, success: false });
-
-            const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
-            const attempts = await LoginAttempt.countDocuments({
-                email,
-                success: false,
-                createdAt: { $gte: fifteenMinsAgo }
-            });
-
-            if (attempts >= 5) {
-                await sendAlertEmail({ email, ip, count: attempts });
-            }
-
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
-
-        await LoginAttempt.create({ email, ipAddress: ip, success: true });
-        res.json({ user: formatUserResponse(user) });
-    } catch (err) {
-        res.status(500).json({ message: 'Login failed', error: err.message });
-    }
-};

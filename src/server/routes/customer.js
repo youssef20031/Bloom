@@ -7,7 +7,6 @@ const router = express.Router();
    AUTHENTICATION
    =============================== */
 router.post('/register', customerController.register);
-router.post('/login', customerController.login);
 
 /* ===============================
    CUSTOMER PROFILE
