@@ -4,11 +4,6 @@ import * as customerController from '../controllers/customer.js';
 const router = express.Router();
 
 /* ===============================
-   AUTHENTICATION
-   =============================== */
-router.post('/register', customerController.register);
-
-/* ===============================
    CUSTOMER PROFILE
    =============================== */
 router.get('/profile/:userId', customerController.getCustomerProfile);

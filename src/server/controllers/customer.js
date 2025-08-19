@@ -4,6 +4,7 @@ import Customer from '../models/customer.js';
 import SupportTicket from '../models/supportTicket.js';
 import User from '../models/user.js';
 import Product from '../models/product.js';
+import Service from '../models/service.js'; // Import Service model
 
 // Helper to format user response
 const formatUserResponse = (user) => ({
@@ -31,17 +32,15 @@ export const getCustomers = async (req, res) => {
 // Create a new customer
 export const createCustomer = async (req, res) => {
     try {
-        const { name, email, hostingStatus = 'inactive' } = req.body;
-        if (!name || !email) {
-            return res.status(400).json({ message: 'Name and email are required' });
+        const { userId, companyName, contactPerson, phone, address } = req.body;
+        if (!userId || !companyName || !contactPerson) {
+            return res.status(400).json({ message: 'userId, companyName, and contactPerson are required' });
         }
-
-        const exists = await Customer.findOne({ email });
+        const exists = await Customer.findOne({ userId });
         if (exists) {
-            return res.status(409).json({ message: 'Email already exists' });
+            return res.status(409).json({ message: 'Customer already exists for this userId' });
         }
-
-        const newCustomer = await Customer.create({ name, email, hostingStatus });
+        const newCustomer = await Customer.create({ userId, companyName, contactPerson, phone, address });
         res.status(201).json(newCustomer);
     } catch (err) {
         console.error('Error creating customer:', err);
@@ -53,18 +52,15 @@ export const createCustomer = async (req, res) => {
 export const updateCustomer = async (req, res) => {
     try {
         const { id } = req.params;
-        const { name, email, hostingStatus } = req.body;
-
+        const { companyName, contactPerson, phone, address } = req.body;
         const customer = await Customer.findByIdAndUpdate(
             id,
-            { $set: { name, email, hostingStatus } },
+            { $set: { companyName, contactPerson, phone, address } },
             { new: true }
         );
-
         if (!customer) {
             return res.status(404).json({ message: 'Customer not found' });
         }
-
         res.json(customer);
     } catch (err) {
         console.error('Error updating customer:', err);
@@ -94,18 +90,15 @@ export const updateHostingStatus = async (req, res) => {
     try {
         const { id } = req.params;
         const { hostingStatus } = req.body;
-
         const customer = await Customer.findByIdAndUpdate(
             id,
             { hostingStatus },
             { new: true }
         );
-
         if (!customer) {
             return res.status(404).json({ message: 'Customer not found' });
         }
-
-        res.json(customer);
+        res.json({ hostingStatus: customer.hostingStatus });
     } catch (err) {
         console.error('Error updating hosting status:', err);
         res.status(500).json({ message: 'Internal server error' });
@@ -122,7 +115,8 @@ export const getCustomerProfile = async (req, res) => {
 
         const customer = await Customer.findOne({ userId })
             .populate('userId', 'email firstName lastName')
-            .populate('purchasedServices.serviceId', 'name description price');
+            .populate('purchasedServices.serviceId', 'name description price')
+            .populate('purchasedProducts.productId', 'name description price type model vendor'); // Populate purchased products
 
         if (!customer) {
             return res.status(404).json({ message: 'Customer not found' });
@@ -256,46 +250,3 @@ export const addTicketMessage = async (req, res) => {
         res.status(500).json({ message: 'Internal server error' });
     }
 };
-
-/* ===============================
-   AUTH (Register only)
-   =============================== */
-
-export const register = async (req, res) => {
-    try {
-        const { userId, name, email, password, role = 'customer' } = req.body;
-
-        if (!userId || !name || !email || !password) {
-            return res.status(400).json({ message: 'Missing fields (userId, name, email, password required)' });
-        }
-
-        // Check if customer already exists for this userId
-        const exists = await Customer.findOne({ userId });
-        if (exists) {
-            return res.status(409).json({ message: 'Customer already registered with this user ID' });
-        }
-
-        // Make sure userId exists in User collection
-        const userExists = await User.findById(userId);
-        if (!userExists) {
-            return res.status(404).json({ message: 'User account not found' });
-        }
-
-        const passwordHash = await bcrypt.hash(password, 10);
-
-        const customer = await Customer.create({
-            userId,
-            name,
-            email,
-            passwordHash,
-            role
-        });
-
-        res.status(201).json({ user: formatUserResponse(customer) });
-    } catch (err) {
-        console.error('Error registering customer:', err);
-        res.status(500).json({ message: 'Register failed', error: err.message });
-    }
-};
-
-
