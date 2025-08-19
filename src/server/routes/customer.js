@@ -14,11 +14,8 @@ router.get('/profile/:userId', customerController.getCustomerProfile);
 router.get('/purchases/all', customerController.getAllCustomersWithPurchases);
 router.get('/purchases/:customerId', customerController.getCustomerWithPurchases);
 
-// Support ticket routes
-router.post('/tickets', customerController.createSupportTicket);
+// Support ticket routes (customer scope only)
 router.get('/tickets/:customerId', customerController.getCustomerTickets);
-router.get('/tickets/detail/:ticketId', customerController.getSupportTicket);
-router.post('/tickets/:ticketId/message', customerController.addTicketMessage);
 
 
 
