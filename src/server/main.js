@@ -13,7 +13,7 @@ import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
-import supportTicketRoutes from './routes/supportTicket.js';
+
 
 dotenv.config();
 
