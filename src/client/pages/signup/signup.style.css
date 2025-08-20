@@ -1,0 +1,38 @@
+/*
+  Custom styles for the Sign Up page.
+*/
+
+:root {
+    --primary-color: #1e3a8a; /* A darker blue for the side panel */
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+}
+
+.bg-primary {
+    background-color: var(--primary-color);
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.75rem 0.75rem 0.75rem 2.5rem; /* left padding for icon */
+    border-radius: 0.375rem;
+    border: 1px solid #d1d5db;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.form-input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+}
+
+.cta-button {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.cta-button:hover {
+    transform: scale(1.02);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+}

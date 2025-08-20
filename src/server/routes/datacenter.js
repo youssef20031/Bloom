@@ -8,4 +8,9 @@ router.post('/:datacenterId/reading', datacenterController.addIotReading);
 router.get('/', datacenterController.getAllAssetsWithLatestReading);
 router.get("/:id",datacenterController.getDataCenterById)
 
+// High-level health reports
+router.get('/health/overview', datacenterController.getHealthOverview);
+router.get('/health/locations', datacenterController.getHealthByLocation);
+router.get('/health/assets', datacenterController.getAssetsHealthList);
+
 export default router;

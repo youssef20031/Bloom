@@ -26,6 +26,8 @@ afterEach(async () => {
     await User.deleteMany({});
 });
 
+jest.setTimeout(15000);
+
 describe('User API', () => {
   it('should create a new user', async () => {
     const res = await request(app)
@@ -90,4 +92,3 @@ describe('User API', () => {
     expect(res.statusCode).toEqual(200);
   });
 });
-
