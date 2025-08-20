@@ -61,7 +61,7 @@ export const addIotReading = async (req, res) => {
       });
       getIo().emit('new-alert', alert3);
     }
-    if(smokelevel ==1){
+    if (smokelevel === 1) {
       const alert4=await Alert.create({
         datacenterId: datacenter._id,
         type: 'smoke',
