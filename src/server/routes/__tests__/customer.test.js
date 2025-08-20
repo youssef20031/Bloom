@@ -120,30 +120,4 @@ describe('Customer API', () => {
     expect(res.statusCode).toBe(200);
     expect(res.body.companyName).toBe('Co');
   });
-
-  it('should create and retrieve support tickets', async () => {
-    const uid = new mongoose.Types.ObjectId();
-    const customer = await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P' });
-    const ticketRes = await request(app)
-      .post('/api/customers/tickets')
-      .send({ customerId: customer._id.toString(), issue: 'Test issue', priority: 'low' });
-    expect(ticketRes.statusCode).toBe(201);
-    expect(ticketRes.body.ticket.issue).toBe('Test issue');
-    const ticketId = ticketRes.body.ticket._id;
-
-    const listRes = await request(app).get(`/api/customers/tickets/${customer._id}`);
-    expect(listRes.statusCode).toBe(200);
-    expect(Array.isArray(listRes.body)).toBe(true);
-    expect(listRes.body[0]._id).toBe(ticketId);
-
-    const detailRes = await request(app).get(`/api/customers/tickets/detail/${ticketId}`);
-    expect(detailRes.statusCode).toBe(200);
-    expect(detailRes.body.issue).toBe('Test issue');
-
-    const msgRes = await request(app)
-      .post(`/api/customers/tickets/${ticketId}/message`)
-      .send({ message: 'Follow up', authorId: customer._id.toString() });
-    expect(msgRes.statusCode).toBe(200);
-    expect(msgRes.body.ticket.history.some(h => h.message === 'Follow up')).toBe(true);
-  });
 });

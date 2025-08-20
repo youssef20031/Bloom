@@ -35,8 +35,8 @@ export const getSupportTicket = async (req, res) => {
     const { ticketId } = req.params;
     const ticket = await SupportTicket.findById(ticketId)
       .populate('customerId', 'companyName contactPerson')
-      .populate('supportAgentId', 'firstName lastName email')
-      .populate('history.author', 'firstName lastName email');
+      .populate('supportAgentId', 'name email')
+      .populate('history.author', 'name email');
 
     if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
     res.json(ticket);
@@ -76,7 +76,7 @@ export const listSupportTickets = async (req, res) => {
 
     const tickets = await SupportTicket.find(filter)
       .populate('customerId', 'companyName contactPerson')
-      .populate('supportAgentId', 'firstName lastName email')
+      .populate('supportAgentId', 'name email')
       .sort({ createdAt: -1 });
 
     res.json(tickets);
@@ -112,7 +112,7 @@ export const assignSupportAgent = async (req, res) => {
     if (!agent) return res.status(404).json({ message: 'Support agent not found' });
 
     const ticket = await SupportTicket.findByIdAndUpdate(ticketId, { supportAgentId }, { new: true })
-      .populate('supportAgentId', 'firstName lastName email');
+      .populate('supportAgentId', 'name email');
 
     if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
     res.json({ message: 'Agent assigned', ticket });
