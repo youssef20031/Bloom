@@ -184,7 +184,7 @@ export const getCustomerTickets = async (req, res) => {
 
 export const signupCustomer = async (req, res) => {
   try {
-    const { name, email, password, companyName, contactPerson, phone, address,  } = req.body;
+    const { name, email, password, companyName, contactPerson, phone, address } = req.body;
 
     // 1. Create the user
     const user = new User({
