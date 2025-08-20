@@ -162,38 +162,7 @@ export const getCustomerWithPurchases = async (req, res) => {
     }
 };
 
-/* ===============================
-   SUPPORT TICKETS
-   =============================== */
-
-export const createSupportTicket = async (req, res) => {
-    try {
-        const { customerId, issue, priority = 'medium' } = req.body;
-        if (!customerId || !issue) {
-            return res.status(400).json({ message: 'Customer ID and issue description are required' });
-        }
-
-        const customer = await Customer.findById(customerId);
-        if (!customer) {
-            return res.status(404).json({ message: 'Customer not found' });
-        }
-
-        const supportTicket = new SupportTicket({
-            customerId,
-            issue,
-            priority,
-            status: 'open',
-            history: [{ message: `Ticket created: ${issue}`, author: customerId, timestamp: new Date() }]
-        });
-
-        await supportTicket.save();
-
-        res.status(201).json({ message: 'Support ticket created successfully', ticket: supportTicket });
-    } catch (error) {
-        console.error('Error creating support ticket:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-};
+// Create support ticket moved to dedicated support ticket controller
 
 export const getCustomerTickets = async (req, res) => {
     try {
@@ -208,45 +177,40 @@ export const getCustomerTickets = async (req, res) => {
     }
 };
 
-export const getSupportTicket = async (req, res) => {
-    try {
-        const { ticketId } = req.params;
-        const ticket = await SupportTicket.findById(ticketId)
-            .populate('customerId', 'companyName contactPerson')
-            .populate('supportAgentId', 'firstName lastName email')
-            .populate('history.author', 'firstName lastName email');
+// Get specific support ticket moved to dedicated support ticket controller
 
-        if (!ticket) {
-            return res.status(404).json({ message: 'Support ticket not found' });
-        }
+// Add message moved to dedicated support ticket controller
 
-        res.json(ticket);
-    } catch (error) {
-        console.error('Error fetching support ticket:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
-};
 
-export const addTicketMessage = async (req, res) => {
-    try {
-        const { ticketId } = req.params;
-        const { message, authorId } = req.body;
+export const signupCustomer = async (req, res) => {
+  try {
+    const { name, email, password, companyName, contactPerson, phone, address } = req.body;
 
-        if (!message || !authorId) {
-            return res.status(400).json({ message: 'Message and author ID are required' });
-        }
+    // 1. Create the user
+    const user = new User({
+      name,
+      email,
+      password, // TODO: hash before saving
+      role: 'customer'
+    });
+    await user.save();
 
-        const ticket = await SupportTicket.findById(ticketId);
-        if (!ticket) {
-            return res.status(404).json({ message: 'Support ticket not found' });
-        }
+    // 2. Create the customer linked to the user
+    const customer = new Customer({
+      userId: user._id,
+      companyName,
+      contactPerson,
+      phone,
+      address
+    });
+    await customer.save();
 
-        ticket.history.push({ message, author: authorId, timestamp: new Date() });
-        await ticket.save();
-
-        res.json({ message: 'Message added successfully', ticket });
-    } catch (error) {
-        console.error('Error adding message to ticket:', error);
-        res.status(500).json({ message: 'Internal server error' });
-    }
+    res.status(201).json({
+      message: 'Customer registered successfully',
+      user,
+      customer
+    });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
 };

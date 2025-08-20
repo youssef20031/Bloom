@@ -3,9 +3,9 @@ import * as customerController from '../controllers/customer.js';
 
 const router = express.Router();
 
-/* ===============================
-   CUSTOMER PROFILE
-   =============================== */
+// Authentication routes
+router.post('/signup', customerController.signupCustomer);
+// Customer profile routes
 router.get('/profile/:userId', customerController.getCustomerProfile);
 
 /* ===============================
@@ -17,11 +17,7 @@ router.get('/purchases/:customerId', customerController.getCustomerWithPurchases
 /* ===============================
    SUPPORT TICKETS
    =============================== */
-router.post('/tickets', customerController.createSupportTicket);
 router.get('/tickets/:customerId', customerController.getCustomerTickets);
-router.get('/tickets/detail/:ticketId', customerController.getSupportTicket);
-router.post('/tickets/:ticketId/message', customerController.addTicketMessage);
-
 /* ===============================
    CUSTOMER CRUD + HOSTING STATUS
    =============================== */
