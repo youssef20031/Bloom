@@ -16,7 +16,7 @@ export const createDatacenterAsset = async (req, res) => {
 export const addIotReading = async (req, res) => {
   try {
     const { datacenterId } = req.params;
-    const { temperature, humidity, powerDraw ,smokelevel} = req.body;
+    const { temperature, humidity, powerDraw, smokelevel } = req.body;
 
     const datacenter = await Datacenter.findById(datacenterId);
     if (!datacenter) {
