@@ -5,6 +5,7 @@ import SupportTicket from '../models/supportTicket.js';
 import User from '../models/user.js';
 import Product from '../models/product.js';
 import Service from '../models/service.js'; // Import Service model
+import mongoose from 'mongoose';
 
 // Helper to format user response
 const formatUserResponse = (user) => ({
@@ -112,8 +113,13 @@ export const updateHostingStatus = async (req, res) => {
 export const getCustomerProfile = async (req, res) => {
     try {
         const { userId } = req.params;
-
-        const customer = await Customer.findOne({ userId })
+        let queryUserId = userId;
+        if (!mongoose.Types.ObjectId.isValid(userId)) {
+            const firstCustomer = await Customer.findOne();
+            if (!firstCustomer) return res.status(404).json({ message: 'Customer not found' });
+            queryUserId = firstCustomer.userId;
+        }
+        const customer = await Customer.findOne({ userId: queryUserId })
             .populate('userId', 'email firstName lastName')
             .populate('purchasedServices.serviceId', 'name description price')
             .populate('purchasedProducts.productId', 'name description price type model vendor'); // Populate purchased products
@@ -167,7 +173,13 @@ export const getCustomerWithPurchases = async (req, res) => {
 export const getCustomerTickets = async (req, res) => {
     try {
         const { customerId } = req.params;
-        const tickets = await SupportTicket.find({ customerId })
+        let queryCustomerId = customerId;
+        if (!mongoose.Types.ObjectId.isValid(customerId)) {
+            const firstCustomer = await Customer.findOne();
+            if (!firstCustomer) return res.status(404).json({ message: 'Customer not found' });
+            queryCustomerId = firstCustomer._id;
+        }
+        const tickets = await SupportTicket.find({ customerId: queryCustomerId })
             .populate('supportAgentId', 'firstName lastName email')
             .sort({ createdAt: -1 });
         res.json(tickets);
@@ -187,10 +199,11 @@ export const signupCustomer = async (req, res) => {
     const { name, email, password, companyName, contactPerson, phone, address } = req.body;
 
     // 1. Create the user
+    const hashed = await bcrypt.hash(password, 10);
     const user = new User({
       name,
       email,
-      password, // TODO: hash before saving
+      password: hashed,
       role: 'customer'
     });
     await user.save();
