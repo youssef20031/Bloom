@@ -4,6 +4,7 @@ const customerSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
   companyName: { type: String, required: true },
   contactPerson: { type: String, required: true },
+  hostingStatus: { type: String, enum: ['active', 'inactive'], default: 'inactive' },
   phone: { type: String },
   address: {
     street: { type: String },
@@ -31,4 +32,3 @@ const customerSchema = new mongoose.Schema({
 const Customer = mongoose.model('Customer', customerSchema);
 
 export default Customer;
-

@@ -6,13 +6,14 @@ import { Server } from "socket.io";
 import http from "http";          
 import user from "./routes/user.js";
 import serviceRoutes from './routes/service.js';
+import supportTicketRoutes from './routes/supportTicket.js';
 import datacenterRoutes from'./routes/datacenter.js'
 import alertsRoutes from './routes/alerts.js'
 import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
-import revenueReportRoutes from './routes/revenueReport.js';
+
 
 dotenv.config();
 
@@ -30,6 +31,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/customers", customerRoutes);
+app.use("/api/support", supportTicketRoutes);
 setIo(io);
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
@@ -63,8 +65,8 @@ app.use('/api/datacenter',datacenterRoutes);
 // Alerts routes
 app.use('/api/alerts',alertsRoutes);
 
-// Revenue report routes
-app.use('/api/revenue-report', revenueReportRoutes);
+// Support ticket routes
+app.use('/api/support-tickets', supportTicketRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
