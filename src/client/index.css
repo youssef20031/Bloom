@@ -1,3 +1,9 @@
+/*
+  This file can be used for any custom CSS that isn't covered by Tailwind CSS.
+  For this project, Tailwind handles most of the styling, but you could add
+  custom animations, component styles, or other specific rules here.
+*/
+
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -25,10 +31,7 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
 }
 
 h1 {
