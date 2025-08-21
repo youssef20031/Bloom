@@ -5,29 +5,37 @@ export const createService = async (req, res) => {
   try {
     const { associatedProducts = [] } = req.body;
 
-    // If there are products linked to the service
     if (associatedProducts.length > 0) {
-      // Fetch the products from DB
-      const products = await Product.find({ _id: { $in: associatedProducts } });
+      // Count how many times each product appears
+      const productCounts = associatedProducts.reduce((acc, id) => {
+        acc[id] = (acc[id] || 0) + 1;
+        return acc;
+      }, {});
 
-      // Check if all requested products exist
-      if (products.length !== associatedProducts.length) {
-        return res.status(400).json({ message: 'One or more products do not exist' });
+      // Fetch all unique products
+      const products = await Product.find({
+        _id: { $in: Object.keys(productCounts) }
+      });
+
+      if (products.length !== Object.keys(productCounts).length) {
+        return res.status(400).json({ message: "One or more products do not exist" });
       }
 
-      // Check stock availability
+      // Check stock availability per product
       for (const product of products) {
-        if (product.stock <= 0) {
+        const requiredQty = productCounts[product._id.toString()];
+        if (product.stock < requiredQty) {
           return res.status(400).json({
-            message: `Product ${product.name} is out of stock`
+            message: `Not enough stock for ${product.name}. Required: ${requiredQty}, Available: ${product.stock}`
           });
         }
       }
 
-      // Update stock (reduce by 1 for each product or whatever logic you need)
+      // Deduct stock
       for (const product of products) {
+        const requiredQty = productCounts[product._id.toString()];
         await Product.findByIdAndUpdate(product._id, {
-          $inc: { stock: -1 }
+          $inc: { stock: -requiredQty }
         });
       }
     }

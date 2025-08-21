@@ -13,7 +13,8 @@ router.get('/profile/:userId', customerController.getCustomerProfile);
    =============================== */
 router.get('/purchases/all', customerController.getAllCustomersWithPurchases);
 router.get('/purchases/:customerId', customerController.getCustomerWithPurchases);
-
+router.post("/add-service", customerController.addServiceToCustomer);
+router.post("/add-product", customerController.addProductToCustomer);
 /* ===============================
    SUPPORT TICKETS
    =============================== */
