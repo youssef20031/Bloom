@@ -1,0 +1,296 @@
+/* General Layout */
+.dashboard {
+  min-height: 100vh;
+  background: #f3f4f6;
+  padding: 24px;
+  font-family: "Segoe UI", Arial, sans-serif;
+  color: #1f2937;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.header h1 {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.header p {
+  font-size: 15px;
+  color: #6b7280;
+}
+
+/* Entity Filters (Tabs) */
+.entity-filters {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+  margin: 16px 0;
+}
+
+.entity-filters button {
+  background: transparent;
+  border: none;
+  padding: 10px 18px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.entity-filters button:hover {
+  color: #111827;
+}
+
+.entity-filters button.active {
+  color: #111827;
+  border-bottom: 3px solid #111827;
+}
+
+/* Table */
+.table-container {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.08);
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.table-controls {
+  display: flex;
+  justify-content: flex-start;
+  padding: 12px;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.rows-selector select {
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  padding: 4px 8px;
+  margin: 0 6px;
+  font-size: 14px;
+}
+
+.table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-wrapper thead {
+  background: #f9fafb;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+  padding: 14px 12px;
+  border-top: 1px solid #e5e7eb;
+  text-align: left;
+  font-size: 14px;
+}
+
+.table-wrapper th {
+  font-weight: 600;
+  color: #374151;
+}
+
+.table-wrapper tbody tr {
+  transition: background 0.2s ease;
+  cursor: pointer;
+}
+
+.table-wrapper tbody tr:hover {
+  background: #f3f4f6;
+}
+
+/* Company Info */
+.company-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.company-name {
+  font-weight: 600;
+  color: #111827;
+}
+
+.contact {
+  font-size: 13px;
+  color: #6b7280;
+}
+
+/* Badges (Status Pills) */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.badge.success {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.badge.danger {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge.muted {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Pills for Services/Products */
+.cell-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cell-pill {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 6px 10px;
+  background: #fafafa;
+}
+
+.cell-pill .label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111827;
+}
+
+.cell-pill .extra {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.extra-info {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid #e5e7eb;
+  padding: 12px;
+  font-size: 14px;
+  color: #4b5563;
+}
+
+.pagination-buttons button {
+  border: none;
+  background: transparent;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.pagination-buttons button:hover {
+  background: #f3f4f6;
+}
+
+.pagination-buttons button.active {
+  background: #111827;
+  color: #fff;
+}
+
+.pagination-buttons button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex; justify-content: center; align-items: center;
+  z-index: 1000;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  max-width: 520px;
+  width: 90%;
+  padding: 20px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: #6b7280;
+}
+
+.close-btn:hover { color: #111827; }
+
+.modal-body {
+  font-size: 14px;
+  color: #374151;
+}
+
+.info-row { margin-bottom: 8px; }
+.info-item { margin-left: 12px; font-size: 13px; color: #4b5563; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* Footer Nav Bar */
+.footer-nav {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  background: #111827;
+  color: #fff;
+  padding: 12px 0;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.footer-nav button {
+  background: transparent;
+  border: none;
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 6px 12px;
+}
+
+.footer-nav button:hover {
+  text-decoration: underline;
+}
