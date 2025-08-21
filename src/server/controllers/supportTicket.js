@@ -1,133 +1,141 @@
-import mongoose from 'mongoose';
 import SupportTicket from '../models/supportTicket.js';
 import Customer from '../models/customer.js';
+import User from '../models/user.js';
 
-// Create a support ticket (from customer dashboard)
+// Create a new support ticket
 export const createSupportTicket = async (req, res) => {
   try {
-    const { userId, customerId, issue, initialMessage } = req.body;
+    let { customerId, issue, priority = 'medium' } = req.body;
 
-    if (!issue || issue.trim().length === 0) {
-      return res.status(400).json({ message: 'Issue description is required' });
+    if (!customerId || !issue) {
+      return res.status(400).json({ message: 'Customer ID and issue description are required' });
     }
 
-    let resolvedCustomerId = customerId;
-
-    // If userId is provided, resolve to the owning customer document
-    if (!resolvedCustomerId && userId) {
-      if (!mongoose.Types.ObjectId.isValid(userId)) {
-        return res.status(400).json({ message: 'Invalid user ID format' });
-      }
-      const customer = await Customer.findOne({ userId });
-      if (!customer) {
-        return res.status(404).json({ message: 'Customer not found for provided userId' });
-      }
-      resolvedCustomerId = customer._id;
+    let customer = await Customer.findById(customerId);
+    if (!customer) {
+      // maybe passed a userId, find customer record
+      customer = await Customer.findOne({ userId: customerId });
+      if (!customer) return res.status(404).json({ message: 'Customer not found' });
+      customerId = customer._id;
+    } else {
+      customerId = customer._id;
     }
 
-    if (!resolvedCustomerId) {
-      return res.status(400).json({ message: 'customerId or userId is required' });
-    }
-
-    const historyEntry = initialMessage
-      ? [{ message: initialMessage, author: mongoose.Types.ObjectId.isValid(userId) ? userId : undefined }]
-      : [];
-
-    const ticket = new SupportTicket({
-      customerId: resolvedCustomerId,
-      issue: issue.trim(),
-      history: historyEntry
+    const supportTicket = new SupportTicket({
+      customerId,
+      issue,
+      priority,
+      status: 'open',
+      history: [{ message: `Ticket created: ${issue}`, author: customerId, timestamp: new Date() }]
     });
 
-    await ticket.save();
-    res.status(201).json(ticket);
+    await supportTicket.save();
+    res.status(201).json({ message: 'Support ticket created successfully', ticket: supportTicket });
   } catch (error) {
-    console.error('Error creating support ticket:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
-// Get all tickets for a given customer (by userId)
-export const getCustomerTickets = async (req, res) => {
+// Get support ticket by id
+export const getSupportTicket = async (req, res) => {
   try {
-    const { userId } = req.params;
+    const { ticketId } = req.params;
+    const ticket = await SupportTicket.findById(ticketId)
+      .populate('customerId', 'companyName contactPerson')
+      .populate('supportAgentId', 'name email')
+      .populate('history.author', 'name email');
 
-    if (!mongoose.Types.ObjectId.isValid(userId)) {
-      return res.status(400).json({ message: 'Invalid user ID format' });
-    }
-
-    const customer = await Customer.findOne({ userId });
-    if (!customer) {
-      return res.status(404).json({ message: 'Customer not found' });
-    }
-
-    const tickets = await SupportTicket.find({ customerId: customer._id })
-      .sort({ createdAt: -1 });
-
-    res.json(tickets);
+    if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
+    res.json(ticket);
   } catch (error) {
-    console.error('Error fetching customer tickets:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
-// Append a message to a ticket history
-export const addMessageToTicket = async (req, res) => {
+// Add message to a support ticket
+export const addTicketMessage = async (req, res) => {
   try {
     const { ticketId } = req.params;
     const { message, authorId } = req.body;
 
-    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
-      return res.status(400).json({ message: 'Invalid ticket ID format' });
-    }
-
-    if (!message || message.trim().length === 0) {
-      return res.status(400).json({ message: 'Message is required' });
+    if (!message || !authorId) {
+      return res.status(400).json({ message: 'Message and author ID are required' });
     }
 
     const ticket = await SupportTicket.findById(ticketId);
-    if (!ticket) {
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
+    if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
 
-    ticket.history.push({ message: message.trim(), author: mongoose.Types.ObjectId.isValid(authorId) ? authorId : undefined });
+    ticket.history.push({ message, author: authorId, timestamp: new Date() });
     await ticket.save();
-
-    res.json(ticket);
+    res.json({ message: 'Message added successfully', ticket });
   } catch (error) {
-    console.error('Error adding message to ticket:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
 };
 
-// Update the status of a ticket
+// List all tickets (optional filters by status or agent)
+export const listSupportTickets = async (req, res) => {
+  try {
+    const { status, agentId } = req.query;
+    const filter = {};
+    if (status) filter.status = status;
+    if (agentId) filter.supportAgentId = agentId;
+
+    const tickets = await SupportTicket.find(filter)
+      .populate('customerId', 'companyName contactPerson')
+      .populate('supportAgentId', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.json(tickets);
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+// Update status of a ticket
 export const updateTicketStatus = async (req, res) => {
   try {
     const { ticketId } = req.params;
-    const { status } = req.body;
+    const { status } = req.body; // 'open' | 'in_progress' | 'closed'
+    if (!status) return res.status(400).json({ message: 'Status is required' });
 
-    if (!mongoose.Types.ObjectId.isValid(ticketId)) {
-      return res.status(400).json({ message: 'Invalid ticket ID format' });
-    }
+    const ticket = await SupportTicket.findByIdAndUpdate(ticketId, { status }, { new: true });
+    if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
 
-    const allowed = ['open', 'in_progress', 'closed'];
-    if (!allowed.includes(status)) {
-      return res.status(400).json({ message: 'Invalid status value' });
-    }
-
-    const ticket = await SupportTicket.findByIdAndUpdate(
-      ticketId,
-      { status },
-      { new: true }
-    );
-
-    if (!ticket) {
-      return res.status(404).json({ message: 'Ticket not found' });
-    }
-
-    res.json(ticket);
+    res.json({ message: 'Status updated', ticket });
   } catch (error) {
-    console.error('Error updating ticket status:', error);
-    res.status(500).json({ message: 'Internal server error' });
+    res.status(500).json({ message: 'Internal server error', error: error.message });
   }
-}; 
+};
+
+// Assign support agent to a ticket
+export const assignSupportAgent = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const { supportAgentId } = req.body;
+    if (!supportAgentId) return res.status(400).json({ message: 'supportAgentId is required' });
+
+    const agent = await User.findById(supportAgentId);
+    if (!agent) return res.status(404).json({ message: 'Support agent not found' });
+
+    const ticket = await SupportTicket.findByIdAndUpdate(ticketId, { supportAgentId }, { new: true })
+      .populate('supportAgentId', 'name email');
+
+    if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
+    res.json({ message: 'Agent assigned', ticket });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};
+
+// Delete a support ticket
+export const deleteSupportTicket = async (req, res) => {
+  try {
+    const { ticketId } = req.params;
+    const ticket = await SupportTicket.findByIdAndDelete(ticketId);
+    if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
+    res.json({ message: 'Support ticket deleted' });
+  } catch (error) {
+    res.status(500).json({ message: 'Internal server error', error: error.message });
+  }
+};

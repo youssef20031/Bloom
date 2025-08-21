@@ -13,12 +13,13 @@ import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
-import chatRoutes from "./routes/chatBot.js";
-
+import cors from "cors"; 
 
 dotenv.config();
 
 const app = express();
+app.use(cors({ origin: "*" }));
+
 const server = http.createServer(app);
 
 const io = new Server(server, {
@@ -32,7 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/customers", customerRoutes);
-app.use("/api/support", supportTicketRoutes);
+app.use("/api/support-ticket", supportTicketRoutes); // Use only /api/support-ticket for support tickets
 setIo(io);
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
@@ -67,8 +68,8 @@ app.use('/api/datacenter',datacenterRoutes);
 app.use('/api/alerts',alertsRoutes);
 
 // Support ticket routes
-app.use('/api/support-tickets', supportTicketRoutes);
-app.use('/api/chat', chatRoutes);
+app.use('/api/support-ticket', supportTicketRoutes);
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);
