@@ -8,6 +8,8 @@ export default function ITDashboard() {
 	const [assets, setAssets] = useState([]);
 	const [servers, setServers] = useState([]);
 	const [changes, setChanges] = useState([]);
+	const [users, setUsers] = useState([]);
+	const [alerts, setAlerts] = useState([]);
 	const [healthOverview, setHealthOverview] = useState(null);
 	// Prepare dynamic health metrics array
 	const healthMetrics = useMemo(() => {
@@ -23,9 +25,11 @@ export default function ITDashboard() {
 	const kpiMetrics = useMemo(() => {
 		const base = [
 			{ icon: AlertTriangle, title: 'Open Incidents', value: incidents.filter(i => i.status === 'open').length },
+			{ icon: Bell, title: 'Active Alerts', value: alerts.length },
 			{ icon: Wrench, title: 'Change Requests', value: changes.length },
 			{ icon: Server, title: 'Assets Inventory', value: assets.length },
-			{ icon: LayoutDashboard, title: 'Servers', value: servers.length }
+			{ icon: LayoutDashboard, title: 'Servers', value: servers.length },
+			{ icon: Users, title: 'Users', value: users.length }
 		];
 		if (healthOverview) {
 			if (healthOverview.averages.temperature != null) {
@@ -39,7 +43,7 @@ export default function ITDashboard() {
 			}
 		}
 		return base;
-	}, [incidents, changes, assets, servers, healthOverview]);
+	}, [incidents, alerts, changes, assets, servers, users, healthOverview]);
 	const priorityToClass = (priority) => {
 		switch (priority) {
 			case 'high': return 'badge-red';
@@ -78,6 +82,14 @@ export default function ITDashboard() {
 			.then(res => res.json())
 			.then(data => setHealthOverview(data))
 			.catch(err => console.error(err));
+		fetch('/api/users')
+			.then(res => res.json())
+			.then(data => setUsers(data))
+			.catch(err => console.error(err));
+		fetch('/api/alerts')
+			.then(res => res.json())
+			.then(data => setAlerts(data))
+			.catch(err => console.error(err));
 	}, []);
 	// Search term state
 	const [searchTerm, setSearchTerm] = useState('');
@@ -111,6 +123,14 @@ export default function ITDashboard() {
 			c.type.toLowerCase().includes(term)
 		);
 	}, [changes, searchTerm]);
+	const filteredUsers = useMemo(() => {
+		const term = searchTerm.toLowerCase();
+		return users.filter(u =>
+			u.name.toLowerCase().includes(term) ||
+			u.email.toLowerCase().includes(term) ||
+			u.role.toLowerCase().includes(term)
+		);
+	}, [users, searchTerm]);
 	// Export current table data as CSV
 	const exportCSV = () => {
 		let headers = [], rows = [];
@@ -160,22 +180,24 @@ export default function ITDashboard() {
 			{/* Sidebar */}
 			<aside className="w-64 bg-primary text-white flex-shrink-0">
 				<div className="p-6 text-2xl font-bold">BLOOM</div>
-				<nav className="mt-8">
-					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
-						<LayoutDashboard className="w-5 h-5 mr-3" /> Dashboard
-					</a>
-					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
-						<AlertTriangle className="w-5 h-5 mr-3" /> Incidents
-					</a>
-					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
-						<Server className="w-5 h-5 mr-3" /> Infrastructure
-					</a>
-					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
-						<Wrench className="w-5 h-5 mr-3" /> Changes
-					</a>
-					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
-						<Users className="w-5 h-5 mr-3" /> Users
-					</a>
+				<nav className="mt-8 space-y-2">
+					{[
+						{ icon: LayoutDashboard, label: 'Dashboard', id: 'Dashboard' },
+						{ icon: AlertTriangle, label: 'Incidents', id: 'Incidents' },
+						{ icon: Server, label: 'Assets', id: 'Assets' },
+						{ icon: Wrench, label: 'Changes', id: 'Changes' },
+						{ icon: Users, label: 'Users', id: 'Users' }
+					].map(({ icon: Icon, label, id }) => (
+						<button
+							key={id}
+							type="button"
+							onClick={() => setActiveTab(id)}
+							className={`w-full flex items-center px-4 py-3 text-white bg-primary hover:bg-primary-700 transition-colors duration-200 ${activeTab===id ? 'bg-primary-700 border-r-4 border-white' : ''}`}
+						>
+							<Icon className="w-5 h-5 mr-3" />
+							<span className="font-medium">{label}</span>
+						</button>
+					))}
 				</nav>
 			</aside>
 
@@ -279,6 +301,14 @@ export default function ITDashboard() {
 											<th>Updated</th>
 										</tr>
 									)}
+									{activeTab === 'Users' && (
+										<tr>
+											<th>Name</th>
+											<th>Email</th>
+											<th>Role</th>
+											<th>Created</th>
+										</tr>
+									)}
 								</thead>
 								<tbody>
 									{activeTab === 'Incidents' && filteredIncidents.map((row) => (
@@ -317,6 +347,14 @@ export default function ITDashboard() {
 											<td>{c.type}</td>
 											<td>{new Date(c.createdAt).toLocaleString()}</td>
 											<td>{new Date(c.updatedAt).toLocaleString()}</td>
+										</tr>
+									))}
+									{activeTab === 'Users' && filteredUsers.map((u) => (
+										<tr key={u._id}>
+											<td>{u.name}</td>
+											<td>{u.email}</td>
+											<td>{u.role}</td>
+											<td>{new Date(u.createdAt).toLocaleString()}</td>
 										</tr>
 									))}
 								</tbody>
