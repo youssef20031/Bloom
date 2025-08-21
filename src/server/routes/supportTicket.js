@@ -1,25 +1,23 @@
 import express from 'express';
 import {
-  createSupportTicket,
-  getSupportTicket,
-  addTicketMessage,
-  listSupportTickets,
-  updateTicketStatus,
-  assignSupportAgent,
-  deleteSupportTicket
+	createSupportTicket,
+	getCustomerTickets,
+	addMessageToTicket,
+	updateTicketStatus
 } from '../controllers/supportTicket.js';
 
 const router = express.Router();
 
-// Collection routes
-router.get('/', listSupportTickets);
+// Create a new ticket
 router.post('/', createSupportTicket);
 
-// Item routes
-router.get('/:ticketId', getSupportTicket);
-router.post('/:ticketId/message', addTicketMessage);
-router.put('/:ticketId/status', updateTicketStatus);
-router.put('/:ticketId/assign', assignSupportAgent);
-router.delete('/:ticketId', deleteSupportTicket);
+// Get tickets for a customer by userId
+router.get('/customer/:userId', getCustomerTickets);
 
-export default router;
+// Add a message to ticket
+router.post('/:ticketId/messages', addMessageToTicket);
+
+// Update ticket status
+router.patch('/:ticketId/status', updateTicketStatus);
+
+export default router; 

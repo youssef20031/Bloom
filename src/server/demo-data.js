@@ -73,54 +73,65 @@ const sampleCustomer = {
 export const populateDemoData = async () => {
   try {
     console.log('Starting demo data population...');
+
+    // If the sample user already exists, return its id to make this operation idempotent
+    const existingUser = await User.findOne({ email: sampleUser.email });
+    if (existingUser) {
+      return existingUser._id;
+    }
     
     // Create user
     const user = new User(sampleUser);
     await user.save();
     console.log('User created:', user._id);
     
-    // Create services
+    // Create services (only if they do not exist)
     const services = [];
     for (const serviceData of sampleServices) {
-      const service = new Service(serviceData);
-      await service.save();
+      let service = await Service.findOne({ name: serviceData.name });
+      if (!service) {
+        service = new Service(serviceData);
+        await service.save();
+        console.log('Service created:', service.name);
+      }
       services.push(service);
-      console.log('Service created:', service.name);
     }
     
     // Create customer with purchased services
-    const customer = new Customer({
-      userId: user._id,
-      ...sampleCustomer,
-      purchasedServices: [
-        {
-          serviceId: services[0]._id,
-          purchaseDate: new Date('2024-01-15'),
-          status: 'active',
-          ipAddress: '192.168.1.100'
-        },
-        {
-          serviceId: services[1]._id,
-          purchaseDate: new Date('2024-02-20'),
-          status: 'active',
-          ipAddress: '192.168.1.101'
-        },
-        {
-          serviceId: services[2]._id,
-          purchaseDate: new Date('2024-03-10'),
-          status: 'expired',
-          ipAddress: '192.168.1.102'
-        }
-      ]
-    });
-    
-    await customer.save();
-    console.log('Customer created with purchased services');
+    let customer = await Customer.findOne({ userId: user._id });
+    if (!customer) {
+      customer = new Customer({
+        userId: user._id,
+        ...sampleCustomer,
+        purchasedServices: [
+          {
+            serviceId: services[0]._id,
+            purchaseDate: new Date('2024-01-15'),
+            status: 'active',
+            ipAddress: '192.168.1.100'
+          },
+          {
+            serviceId: services[1]._id,
+            purchaseDate: new Date('2024-02-20'),
+            status: 'active',
+            ipAddress: '192.168.1.101'
+          },
+          {
+            serviceId: services[2]._id,
+            purchaseDate: new Date('2024-03-10'),
+            status: 'expired',
+            ipAddress: '192.168.1.102'
+          }
+        ]
+      });
+      await customer.save();
+      console.log('Customer created with purchased services');
+    }
     
     console.log('Demo data population completed successfully!');
-    console.log('User ID for testing:', user._id);
+    console.log('User ID for testing:', user ? user._id : existingUser._id);
     
-    return user._id;
+    return user ? user._id : existingUser._id;
   } catch (error) {
     console.error('Error populating demo data:', error);
     throw error;
