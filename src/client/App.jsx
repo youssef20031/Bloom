@@ -5,6 +5,7 @@ import Services from "./pages/Services";
 import Signup from "./pages/signup/signup";
 import Login from "./pages/login/login";
 import CustomerView from "./pages/customerview/customerview";
+import Adminview from "./pages/adminview/adminview";
 
 function App() {
   return (
@@ -15,6 +16,8 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/dashboard" element={<CustomerView />} />
+        <Route path="/admin" element={<Adminview />} />
+        {/* Add more routes as needed */}
       </Routes>
     </BrowserRouter>
   );
