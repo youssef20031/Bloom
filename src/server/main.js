@@ -13,7 +13,9 @@ import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
-import cors from "cors"; 
+import cors from "cors";
+import chatRoutes from "./routes/chatBot.js";
+
 
 dotenv.config();
 
@@ -69,6 +71,10 @@ app.use('/api/alerts',alertsRoutes);
 
 // Support ticket routes
 app.use('/api/support-ticket', supportTicketRoutes);
+
+
+app.use('/api/chat', chatRoutes);
+
 
 // Error handling middleware
 app.use((err, req, res, next) => {

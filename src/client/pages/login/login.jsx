@@ -35,9 +35,9 @@ export default function Login() {
           navigate('/dashboard');
         } else if (userRole === 'admin') {
           navigate('/admin');
-        } else {
+        } else if (userRole === 'presales') {
           // fallback for other roles
-          navigate('/');
+          navigate('/chatBot');
         }
       }
     } catch (err) {

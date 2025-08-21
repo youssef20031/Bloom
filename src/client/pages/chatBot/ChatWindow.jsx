@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import "./chatBot.css";
 
 const ChatWindow = ({ messages, isLoading }) => {
     const chatWindowRef = useRef(null);

@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import axios from 'axios';
-import '../../index.css';
+
+import "./chatBot.css";
 import ChatWindow from './ChatWindow.jsx';
 import ChatInput from './ChatInput.jsx';
 import SessionList from './SessionList.jsx';
@@ -17,13 +18,9 @@ export default function ChatBot() {
     const [isLoading, setIsLoading] = useState(false);
     const [sessions, setSessions] = useState([]);
     const [selectedSession, setSelectedSession] = useState(null);
-
-    // --- FIX 1: Correct and consistent API base URL ---
-    // Change the port if your backend runs on a different one.
-    // In a production build, you would use a relative path like '/api' and a proxy.
+    const user= localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
     const API_BASE = 'http://localhost:3000/api/chat'; 
-    const PRESALES_USER_ID = import.meta.env.VITE_PRESALES_USER_ID || undefined;
-
+    const PRESALES_USER_ID = user._id || undefined;
     useEffect(() => {
         fetchSessions();
     }, []);
@@ -31,7 +28,6 @@ export default function ChatBot() {
     const fetchSessions = async () => {
         try {
             const params = PRESALES_USER_ID ? { presalesUserId: PRESALES_USER_ID } : {};
-            // --- FIX 2: Use the correct, consistent path ---
             const { data } = await axios.get(`${API_BASE}/sessions`, { params });
             setSessions(data);
         } catch (e) {
@@ -52,7 +48,6 @@ export default function ChatBot() {
         setSelectedSession(session);
         setShowReport(false);
         try {
-            // --- FIX 3: Use the correct, consistent path ---
             const { data } = await axios.get(`${API_BASE}/sessions/${session._id}`);
             const mappedMessages = data.messages.map(m => ({
                 sender: m.sender === 'human' ? 'user' : 'bot',
@@ -62,7 +57,8 @@ export default function ChatBot() {
                 { sender: 'bot', text: `Session "${data.sessionTitle}" loaded. Continue your conversation.` },
                 ...mappedMessages
             ]);
-        } catch (e) {
+        } catch (e)
+        {
             console.error('Failed to load session details', e);
             setMessages([{ sender: 'bot', text: "Error loading session. Please try again." }]);
         }
@@ -77,14 +73,13 @@ export default function ChatBot() {
         setIsLoading(true);
 
         try {
-            // --- FIX 4: Use the correct, consistent path ---
             const response = await fetch(`${API_BASE}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     input,
                     sessionId: selectedSession?._id,
-                    presalesUserId: PRESALES_USER_ID // Send it if available, backend will handle if it's undefined
+                    presalesUserId: PRESALES_USER_ID
                 })
             });
 
@@ -166,42 +161,38 @@ export default function ChatBot() {
         }
     };
 
-    // ... (all your functions and state remain the same) ...
-
     return (
-        <div className="app-container layout-with-sidebar">
-            <div className="sidebar">
-                <button onClick={handleNewSession}>+ New Session</button>
-                <SessionList sessions={sessions} selectedSessionId={selectedSession?._id} onSelect={handleSelectSession} />
-            </div>
-
-            {/* --- THIS IS THE FIX --- */}
-            {/* A new wrapper for the main content area. This is now the grid's 2nd child. */}
-            <main className="main-content-area">
+        <div className="chatbot-wrapper">
+            <div className="app-container">
+                <div className="sidebar">
+                    <button onClick={handleNewSession}>+ New Session</button>
+                    <SessionList sessions={sessions} selectedSessionId={selectedSession?._id} onSelect={handleSelectSession} />
+                </div>
                 
-                {/* Chat view is now INSIDE the wrapper */}
-                <div className={`content ${showReport ? 'hidden' : ''}`}>
-                    <header className="app-header">
-                        <h1>Dell Presales Technical Assistant</h1>
-                        {selectedSession && <div className={`badge status-${selectedSession.status}`}>{selectedSession.status}</div>}
-                    </header>
-                    <ChatWindow messages={messages} isLoading={isLoading} />
-                    <ChatInput input={input} setInput={setInput} onSend={handleSend} onEnd={handleExit} disabled={isLoading} />
-                </div>
-
-                {/* Report view is also INSIDE the wrapper */}
-                <div className={`report-view ${showReport ? '' : 'hidden'}`}>
-                    <header className="app-header">
-                        <h1>Presales Call Summary Report</h1>
-                    </header>
-                    <div className="report-content report-markdown">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportContent}</ReactMarkdown>
+                <main className="main-content-area">
+                    {/* Chat view */}
+                    <div className={`content ${showReport ? 'hidden' : ''}`}>
+                        <header className="app-header">
+                            <h1>Dell Presales Technical Assistant</h1>
+                            {/* --- EDIT: Added fallback for status --- */}
+                            {selectedSession && <div className={`badge status-${selectedSession.status || 'active'}`}>{selectedSession.status || 'active'}</div>}
+                        </header>
+                        <ChatWindow messages={messages} isLoading={isLoading} />
+                        <ChatInput input={input} setInput={setInput} onSend={handleSend} onEnd={handleExit} disabled={isLoading} />
                     </div>
-                    <button onClick={() => setShowReport(false)}>Back to Chat</button>
-                </div>
 
-            </main>
+                    {/* Report view */}
+                    <div className={`report-view ${showReport ? '' : 'hidden'}`}>
+                        <header className="app-header">
+                            <h1>Presales Call Summary Report</h1>
+                        </header>
+                        <div className="report-content report-markdown">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>{reportContent}</ReactMarkdown>
+                        </div>
+                        <button onClick={() => setShowReport(false)}>Back to Chat</button>
+                    </div>
+                </main>
+            </div>
         </div>
     );
-
 }

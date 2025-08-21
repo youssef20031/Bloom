@@ -24,7 +24,7 @@ const chatSessionSchema = new mongoose.Schema(
             type: mongoose.Schema.Types.ObjectId,
             ref: 'User',
             // --- THIS IS THE FIX ---
-            required: false, // Changed from true to false
+            required: true, // Changed from true to false
             index: true,
         },
         customerId: {

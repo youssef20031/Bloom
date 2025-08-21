@@ -1,4 +1,5 @@
 import React from 'react';
+import "./chatBot.css";
 
 const SessionList = ({ sessions, selectedSessionId, onSelect }) => {
     return (

@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react'; // <-- Import hooks
-import "./chatInput.css";
+import "./chatBot.css";
 
 const ChatInput = ({ input, setInput, onSend, onEnd, disabled }) => {
     // 1. Create a ref to get direct access to the div element

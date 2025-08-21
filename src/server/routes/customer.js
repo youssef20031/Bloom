@@ -7,8 +7,6 @@ const router = express.Router();
 router.post('/signup', customerController.signupCustomer);
 // Customer profile routes
 router.get('/profile/:userId', customerController.getCustomerProfile);
-// router.get('/dashboard/:userId', customerController.getCustomerDashboard);
-// router.get('/service/:serviceId', customerController.getServiceDetails);
 
 /* ===============================
    CUSTOMER PURCHASES
