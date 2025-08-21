@@ -30,7 +30,7 @@ afterAll(async () => {
 
 afterEach(async () => {
     await Customer.deleteMany({});
-  await SupportTicket.deleteMany({});
+    await SupportTicket.deleteMany({});
 });
 
 describe('Customer API', () => {
@@ -86,38 +86,38 @@ describe('Customer API', () => {
         expect(res.body.message).toBe('Customer deleted');
     });
 
-  it('should update hosting status', async () => {
-    const uid = new mongoose.Types.ObjectId();
-    const customer = await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P' });
-    const res = await request(app)
-      .put(`/api/customers/${customer._id}/hosting/status`)
-      .send({ hostingStatus: 'active' });
-    expect(res.statusCode).toBe(200);
-    expect(res.body.hostingStatus).toBe('active');
-  });
+    it('should update hosting status', async () => {
+        const uid = new mongoose.Types.ObjectId();
+        const customer = await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P' });
+        const res = await request(app)
+            .put(`/api/customers/${customer._id}/hosting/status`)
+            .send({ hostingStatus: 'active' });
+        expect(res.statusCode).toBe(200);
+        expect(res.body.hostingStatus).toBe('active');
+    });
 
-  it('should fetch customer profile', async () => {
-    const uid = new mongoose.Types.ObjectId();
-    await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P' });
-    const res = await request(app).get(`/api/customers/profile/${uid.toString()}`);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.companyName).toBe('Co');
-  });
+    it('should fetch customer profile', async () => {
+        const uid = new mongoose.Types.ObjectId();
+        await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P' });
+        const res = await request(app).get(`/api/customers/profile/${uid.toString()}`);
+        expect(res.statusCode).toBe(200);
+        expect(res.body.companyName).toBe('Co');
+    });
 
-  it('should get all customers with purchases', async () => {
-    const uid = new mongoose.Types.ObjectId();
-    await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P', purchasedProducts: [{ productId: new mongoose.Types.ObjectId(), purchaseDate: new Date(), status: 'active', quantity: 1 }] });
-    const res = await request(app).get('/api/customers/purchases/all');
-    expect(res.statusCode).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBe(1);
-  });
+    it('should get all customers with purchases', async () => {
+        const uid = new mongoose.Types.ObjectId();
+        await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P', purchasedProducts: [{ productId: new mongoose.Types.ObjectId(), purchaseDate: new Date(), status: 'active', quantity: 1 }] });
+        const res = await request(app).get('/api/customers/purchases/all');
+        expect(res.statusCode).toBe(200);
+        expect(Array.isArray(res.body)).toBe(true);
+        expect(res.body.length).toBe(1);
+    });
 
-  it('should get customer with purchases', async () => {
-    const uid = new mongoose.Types.ObjectId();
-    const customer = await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P', purchasedProducts: [{ productId: new mongoose.Types.ObjectId(), purchaseDate: new Date(), status: 'active', quantity: 1 }] });
-    const res = await request(app).get(`/api/customers/purchases/${customer._id}`);
-    expect(res.statusCode).toBe(200);
-    expect(res.body.companyName).toBe('Co');
-  });
+    it('should get customer with purchases', async () => {
+        const uid = new mongoose.Types.ObjectId();
+        const customer = await Customer.create({ userId: uid, companyName: 'Co', contactPerson: 'P', purchasedProducts: [{ productId: new mongoose.Types.ObjectId(), purchaseDate: new Date(), status: 'active', quantity: 1 }] });
+        const res = await request(app).get(`/api/customers/purchases/${customer._id}`);
+        expect(res.statusCode).toBe(200);
+        expect(res.body.companyName).toBe('Co');
+    });
 });
