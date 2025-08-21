@@ -97,6 +97,14 @@ export default function Adminview() {
                 </div>
             </div>
 
+            {/* --- Navigation moved up --- */}
+            <div className="top-nav">
+                <button>Home</button>
+                <button>Services</button>
+                <button>Support</button>
+                <button>More Info</button>
+            </div>
+
             <div className="main-content">
                 <div className="entity-filters">
                     <div>
@@ -257,13 +265,6 @@ export default function Adminview() {
                         </div>
                     )}
                 </div>
-            </div>
-
-            <div className="footer-nav">
-                <button>Home</button>
-                <button>Services</button>
-                <button>Support</button>
-                <button>More Info</button>
             </div>
 
             {/* --- Modal Rendering --- */}
