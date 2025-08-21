@@ -39,6 +39,9 @@ export default function Login() {
           // fallback for other roles
           navigate('/chatBot');
         }
+        else if (userRole === 'it') {
+          navigate('/it');
+        }
         else {
             navigate('/');
         }
