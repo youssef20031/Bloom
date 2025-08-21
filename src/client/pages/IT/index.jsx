@@ -161,21 +161,21 @@ export default function ITDashboard() {
 			<aside className="w-64 bg-primary text-white flex-shrink-0">
 				<div className="p-6 text-2xl font-bold">BLOOM</div>
 				<nav className="mt-8">
-					<button type="button" onClick={() => setActiveTab('Incidents')} className={`flex items-center px-6 py-3 w-full text-left text-gray-200 hover:bg-blue-800 ${activeTab==='Incidents'?'bg-blue-900':''}`}>
+					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
 						<LayoutDashboard className="w-5 h-5 mr-3" /> Dashboard
-					</button>
-					<button type="button" onClick={() => setActiveTab('Incidents')} className={`flex items-center px-6 py-3 w-full text-left text-gray-200 hover:bg-blue-800 ${activeTab==='Incidents'?'bg-blue-900':''}`}>
+					</a>
+					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
 						<AlertTriangle className="w-5 h-5 mr-3" /> Incidents
-					</button>
-					<button type="button" onClick={() => setActiveTab('Servers')} className={`flex items-center px-6 py-3 w-full text-left text-gray-200 hover:bg-blue-800 ${activeTab==='Servers'?'bg-blue-900':''}`}>
+					</a>
+					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
 						<Server className="w-5 h-5 mr-3" /> Infrastructure
-					</button>
-					<button type="button" onClick={() => setActiveTab('Changes')} className={`flex items-center px-6 py-3 w-full text-left text-gray-200 hover:bg-blue-800 ${activeTab==='Changes'?'bg-blue-900':''}`}>
+					</a>
+					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
 						<Wrench className="w-5 h-5 mr-3" /> Changes
-					</button>
-					<button type="button" onClick={() => setActiveTab('Users')} className={`flex items-center px-6 py-3 w-full text-left text-gray-200 hover:bg-blue-800 ${activeTab==='Users'?'bg-blue-900':''}`}>
+					</a>
+					<a href="#" className="flex items-center px-6 py-3 text-gray-200 hover:bg-blue-800">
 						<Users className="w-5 h-5 mr-3" /> Users
-					</button>
+					</a>
 				</nav>
 			</aside>
 
