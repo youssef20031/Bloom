@@ -39,6 +39,9 @@ export default function Login() {
           // fallback for other roles
           navigate('/chatBot');
         }
+        else {
+            navigate('/');
+        }
       }
     } catch (err) {
       setError('Network error');
