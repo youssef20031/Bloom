@@ -9,6 +9,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -44,70 +45,116 @@ export default function Login() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left Side */}
-      <div className="hidden lg:flex flex-col items-center justify-center w-1/2 bg-primary text-white p-12">
-        <div className="text-center">
-          <svg className="mx-auto h-24 w-auto text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-            {/* ...icon paths... */}
-          </svg>
-          <h1 className="text-5xl font-bold mt-4">BLOOM</h1>
+    <div className="bg-transparent grid grid-cols-1 gap-4">
+      <div className="overflow-hidden bg-gradient-to-br from-slate-700 to-slate-900 w-full max-w-[1440px] h-[896px] relative items-start">
+        {/* Left side - Logo section */}
+        <div className="absolute w-[382px] h-[641px] top-[140px] left-[125px] logo-image">
+          <img
+            className="absolute w-[357px] h-[498px] top-0 left-3"
+            alt="Bloom logo illustration"
+            src="https://c.animaapp.com/TRfIm5C2/img/frame-1984077454.svg"
+          />
+          <div className="absolute top-[497px] left-0 font-['Montserrat'] font-medium text-[#7086a4] text-8xl leading-[144px] whitespace-nowrap">
+            BLOOM
+          </div>
         </div>
-      </div>
 
-      {/* Right Side */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12">
-        <div className="w-full max-w-md">
-          <h2 className="text-3xl font-bold text-gray-800 text-center">Login</h2>
-          <p className="text-center text-gray-600 mt-2">
-            Please choose your role down below and enter your credentials.
-          </p>
+        {/* Right side - Login form */}
+        <main className="absolute w-[810px] h-full top-0 left-[630px] bg-white items-end">
+          <div className="flex flex-col w-[589px] items-start gap-1 absolute top-[60px] left-[102px]">
+            <h1 className="font-['Roboto'] font-bold text-[#1e3a61] text-4xl leading-tight">Login</h1>
+            <p className="font-['Roboto'] font-normal text-[#1e3a61] text-lg leading-[27px]">
+              Please choose your role down below and enter your credentials.
+            </p>
+          </div>
 
-          <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="role" className="text-sm font-medium text-gray-700">Role</label>
-              <div className="relative mt-1">
-                <select id="role" className="form-input appearance-none" value={role} onChange={e => setRole(e.target.value)}>
-                  <option value="">Select Role</option>
-                  <option value="admin">Admin</option>
-                  <option value="customer">Customer</option>
-                  <option value="guest">Guest</option>
-                </select>
-                <span className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                  <ChevronDown className="w-5 h-5 text-gray-400" />
-                </span>
+          <form onSubmit={handleSubmit} className="contents">
+            {/* Role Selection */}
+            <div className="flex flex-col w-[589px] items-start gap-4 absolute top-[179px] left-[102px]">
+              <label className="font-['Roboto'] font-medium text-[#1e3a61] text-[22px] leading-[21px]">
+                Role
+              </label>
+              <div className="flex items-center justify-between p-4 w-full bg-[#f0f0f0] rounded-xl">
+                <div className="flex items-center gap-2">
+                  <select
+                    className="bg-transparent font-['Roboto'] font-normal text-[#656565] text-lg outline-none appearance-none"
+                    value={role}
+                    onChange={e => setRole(e.target.value)}
+                    required
+                  >
+                    <option value="" disabled>Enter Your Role</option>
+                    <option value="admin">Admin</option>
+                    <option value="user">User</option>
+                    <option value="manager">Manager</option>
+                  </select>
+                  <ChevronDown className="w-6 h-6 text-[#656565] pointer-events-none" />
+                </div>
               </div>
             </div>
 
-            <div>
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Mail className="w-5 h-5 text-gray-400" />
-                </span>
-                <input type="email" id="email" placeholder="Enter Your Email" className="form-input" value={email} onChange={e => setEmail(e.target.value)} />
+            {/* Email and Password Fields */}
+            <div className="flex flex-col w-[589px] items-start gap-8 absolute top-[304px] left-[102px]">
+              {/* Email Field */}
+              <div className="flex flex-col items-start gap-4 w-full">
+                <label htmlFor="email-input" className="font-['Roboto'] font-medium text-[#1e3a61] text-[22px] leading-[21px]">
+                  Email
+                </label>
+                <div className="flex w-full items-center gap-4 p-4 bg-[#f0f0f0] rounded-xl">
+                  <Mail className="w-[30px] h-[30px] text-[#656565]" />
+                  <input
+                    id="email-input"
+                    type="email"
+                    className="flex-1 bg-transparent font-['Roboto'] font-normal text-[#656565] text-lg outline-none"
+                    placeholder="Enter Your Email"
+                    value={email}
+                    onChange={e => setEmail(e.target.value)}
+                    required
+                    autoComplete="email"
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div className="flex flex-col items-start gap-4 w-full">
+                <div className="flex justify-between items-center w-full">
+                  <label htmlFor="password-input" className="font-['Roboto'] font-medium text-[#1e3a61] text-[22px] leading-[21px]">
+                    Password
+                  </label>
+                  <button
+                    type="button"
+                    className="font-['Roboto'] font-normal text-[#125ec9] text-lg underline bg-transparent border-none cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => console.log('Forgot password clicked')}
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+                <div className="flex w-full items-center gap-4 p-4 bg-[#f0f0f0] rounded-xl">
+                  <Lock className="w-[30px] h-[30px] text-[#656565]" />
+                  <input
+                    id="password-input"
+                    type={showPassword ? 'text' : 'password'}
+                    className="flex-1 bg-transparent font-['Roboto'] font-normal text-[#656565] text-lg outline-none"
+                    placeholder="Enter Your Password"
+                    value={password}
+                    onChange={e => setPassword(e.target.value)}
+                    required
+                    autoComplete="current-password"
+                  />
+                </div>
               </div>
             </div>
 
-            <div>
-              <div className="flex justify-between items-center">
-                <label htmlFor="password" className="text-sm font-medium text-gray-700">Password</label>
-                <a href="#" className="text-sm text-blue-600 hover:underline">Forgot Password?</a>
-              </div>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Lock className="w-5 h-5 text-gray-400" />
-                </span>
-                <input type="password" id="password" placeholder="Enter Your Password" className="form-input" value={password} onChange={e => setPassword(e.target.value)} />
-              </div>
-            </div>
-
-            {error && <p className="text-red-600 text-sm">{error}</p>}
-            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 cta-button">
-              Login
+            {/* Login Button */}
+            <button
+              type="submit"
+              className="flex w-[593px] h-[66px] items-center justify-center gap-2 px-5 absolute top-[613px] left-[100px] bg-[#1e3a61] rounded-xl border border-solid border-[#1e3a61] cursor-pointer hover:opacity-90 transition-opacity"
+            >
+              <span className="font-['Roboto'] font-normal text-white text-2xl leading-9">
+                Login
+              </span>
             </button>
           </form>
-        </div>
+        </main>
       </div>
     </div>
   );
