@@ -33,7 +33,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/customers", customerRoutes);
-app.use("/api/support", supportTicketRoutes);
+app.use("/api/support-ticket", supportTicketRoutes); // Use only /api/support-ticket for support tickets
 setIo(io);
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
@@ -68,7 +68,7 @@ app.use('/api/datacenter',datacenterRoutes);
 app.use('/api/alerts',alertsRoutes);
 
 // Support ticket routes
-app.use('/api/support-tickets', supportTicketRoutes);
+app.use('/api/support-ticket', supportTicketRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

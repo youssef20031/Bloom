@@ -47,7 +47,7 @@ function usePagination(items, pageSize) {
   return { page, setPage, totalPages, pageItems };
 }
 
-export default function CustomersDashboard() {
+export default function Adminview() {
   const [customers, setCustomers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

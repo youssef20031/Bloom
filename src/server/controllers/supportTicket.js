@@ -5,14 +5,21 @@ import User from '../models/user.js';
 // Create a new support ticket
 export const createSupportTicket = async (req, res) => {
   try {
-    const { customerId, issue, priority = 'medium' } = req.body;
+    let { customerId, issue, priority = 'medium' } = req.body;
 
     if (!customerId || !issue) {
       return res.status(400).json({ message: 'Customer ID and issue description are required' });
     }
 
-    const customer = await Customer.findById(customerId);
-    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    let customer = await Customer.findById(customerId);
+    if (!customer) {
+      // maybe passed a userId, find customer record
+      customer = await Customer.findOne({ userId: customerId });
+      if (!customer) return res.status(404).json({ message: 'Customer not found' });
+      customerId = customer._id;
+    } else {
+      customerId = customer._id;
+    }
 
     const supportTicket = new SupportTicket({
       customerId,
