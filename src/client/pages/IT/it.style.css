@@ -1,0 +1,82 @@
+/* Styles for IT dashboard page - follows the same theme tokens used elsewhere */
+:root {
+  --primary-color: #1e3a8a;
+  --primary-600: #2563eb;
+  --primary-700: #1d4ed8;
+  --slate-50: #f8fafc;
+  --slate-100: #f1f5f9;
+  --slate-200: #e2e8f0;
+  --slate-600: #475569;
+}
+
+.bg-primary { background-color: var(--primary-color); }
+
+.stat-card {
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  padding: 1rem;
+  border-radius: 0.75rem;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.06);
+}
+
+/* KPI */
+.kpi { display: flex; align-items: center; gap: 0.75rem; }
+.kpi .kpi-icon {
+  width: 40px; height: 40px; display: grid; place-items: center; border-radius: 10px;
+  background: #eef2ff; color: #1e40af;
+}
+.kpi-2 .kpi-icon { background: #ecfeff; color: #155e75; }
+.kpi-3 .kpi-icon { background: #dcfce7; color: #15803d; }
+.kpi-4 .kpi-icon { background: #fee2e2; color: #b91c1c; }
+
+/* Segmented control */
+.segmented { display: inline-flex; background: #fff; border: 1px solid var(--slate-200); border-radius: 0.5rem; overflow: hidden; }
+.segment { padding: 0.5rem 0.75rem; border-right: 1px solid var(--slate-200); background: #fff; color: #1f2937; }
+.segment:last-child { border-right: 0; }
+.segment.active { background: #e0e7ff; color: #1e40af; font-weight: 600; }
+
+/* Chips */
+.chip { padding: 0.375rem 0.625rem; border-radius: 9999px; background: var(--slate-100); color: #334155; font-size: 0.85rem; }
+.chip-active { background: #dbeafe; color: #1e40af; font-weight: 600; }
+
+/* Buttons & inputs */
+.btn-primary { background: var(--primary-600); color: #fff; padding: 0.5rem 0.75rem; border-radius: 0.5rem; display: inline-flex; align-items: center; }
+.btn-primary:hover { background: var(--primary-700); }
+.btn-secondary { background: #fff; color: #1f2937; border: 1px solid var(--slate-200); padding: 0.5rem 0.75rem; border-radius: 0.5rem; display: inline-flex; align-items: center; }
+.btn-quiet { background: transparent; color: #1f2937; border: 1px solid var(--slate-200); padding: 0.5rem 0.75rem; border-radius: 0.5rem; display: inline-flex; align-items: center; }
+.btn-small { padding: 0.25rem 0.5rem; }
+.it-input { border: 1px solid var(--slate-200); border-radius: 0.5rem; padding: 0.5rem 0.75rem; }
+.it-select { border: 1px solid var(--slate-200); border-radius: 0.375rem; padding: 0.25rem 0.5rem; }
+
+/* Badges */
+.badge { display: inline-block; padding: 0.125rem 0.5rem; font-size: 0.75rem; border-radius: 0.25rem; font-weight: 600; }
+.badge-red { background: #fee2e2; color: #b91c1c; }
+.badge-orange { background: #ffedd5; color: #c2410c; }
+.badge-yellow { background: #fef9c3; color: #a16207; }
+.badge-green { background: #dcfce7; color: #15803d; }
+.badge-gray { background: #e5e7eb; color: #374151; }
+
+/* Table */
+.it-table { border-collapse: separate; border-spacing: 0; }
+.it-table thead th { background: var(--slate-50); font-weight: 600; color: #334155; padding: 0.75rem 1rem; border-bottom: 1px solid var(--slate-200); }
+.it-table tbody td { padding: 0.9rem 1rem; border-bottom: 1px solid #f1f5f9; }
+.it-table tbody tr:hover { background: #f8fafc; }
+
+.assignee { display: inline-flex; align-items: center; gap: 0.5rem; }
+.assignee img { width: 24px; height: 24px; border-radius: 9999px; }
+
+/* Health */
+.health-item { display: flex; align-items: center; justify-content: space-between; gap: 0.5rem; padding: 0.5rem 0; color: #334155; }
+.health-item svg { color: #64748b; }
+.dot { width: 10px; height: 10px; border-radius: 9999px; display: inline-block; }
+.dot-green { background: #22c55e; }
+.dot-yellow { background: #f59e0b; }
+.dot-red { background: #ef4444; }
+.dot-blue { background: #3b82f6; }
+
+/* Timeline & Activity */
+.timeline { display: grid; gap: 0.75rem; }
+.timeline li { display: grid; grid-template-columns: 110px 1fr; gap: 0.75rem; align-items: center; }
+.timeline .time { color: var(--slate-600); font-size: 0.85rem; }
+.activity { display: grid; gap: 0.5rem; color: #334155; }
+
+

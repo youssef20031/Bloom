@@ -1,38 +1,249 @@
-/*
-  Custom styles for the Sign Up page.
-*/
+@import url('https://fonts.googleapis.com/css?family=Montserrat:500|Roboto:400,500,700');
 
-:root {
-    --primary-color: #1e3a8a; /* A darker blue for the side panel */
+/* Add a basic reset for consistency */
+body,
+html {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Roboto', sans-serif;
 }
 
-body {
-    font-family: 'Inter', sans-serif;
+.signup-container {
+    width: 100vw;
+    min-height: 100vh;
+    display: flex; /* Use flexbox to ensure child fills the height */
 }
 
-.bg-primary {
-    background-color: var(--primary-color);
-}
-
-.form-input {
+/* KEY CHANGE: Converted the wrapper to a flex container */
+.signup-wrapper {
+    display: flex;
     width: 100%;
-    padding: 0.75rem 0.75rem 0.75rem 2.5rem; /* left padding for icon */
-    border-radius: 0.375rem;
-    border: 1px solid #d1d5db;
-    transition: border-color 0.2s, box-shadow 0.2s;
+    /* Removed fixed width and height to allow it to be responsive */
 }
 
-.form-input:focus {
+/* KEY CHANGE: Left panel is now a flex item */
+.signup-left-panel {
+    /* Removed position: absolute, top, left */
+    flex: 1; /* Assign a proportional size */
+    background: linear-gradient(221deg, rgba(28, 43, 64, 1) 0%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    min-width: 300px;
+}
+
+/* Simplified positioning for the illustration and brand */
+.signup-illustration {
+    width: 100%;
+    max-width: 357px;
+    height: auto;
+    margin-bottom: 20px;
+}
+
+.signup-brand {
+    font-family: 'Montserrat', Helvetica;
+    font-weight: 500;
+    color: #7086a4;
+    font-size: 6vw; /* Responsive font size */
+    max-font-size: 96px;
+    letter-spacing: 0;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* KEY CHANGE: Right panel is now a flex item */
+.signup-right-panel {
+    /* Removed position: absolute, top, left */
+    flex: 1.5; /* Make it take more space than the left panel */
+    background: white;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 40px;
+    overflow-y: auto; /* Allow form to scroll on small screens */
+}
+
+/* KEY CHANGE: Form is now centered by its flex parent */
+.signup-form {
+    /* Removed position: absolute, top, left */
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 590px; /* Keep a max-width for readability */
+    gap: 30px;
+}
+
+.signup-header {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+    width: 100%;
+}
+
+.signup-title {
+    font-family: 'Roboto', Helvetica;
+    font-weight: 700;
+    color: rgba(30, 58, 97, 1);
+    font-size: 40px;
+    line-height: 120%;
+}
+
+.signup-subtitle {
+    font-family: 'Roboto', Helvetica;
+    font-weight: 400;
+    color: rgba(30, 58, 97, 1);
+    font-size: 18px;
+    line-height: 27px;
+}
+
+.signup-fields {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 24px;
+    width: 100%;
+}
+
+.signup-field {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    width: 100%;
+}
+
+.signup-label {
+    font-family: 'Roboto', Helvetica;
+    font-weight: 500;
+    color: rgba(30, 58, 97, 1);
+    font-size: 20px;
+    letter-spacing: -0.32px;
+    line-height: 21px;
+}
+
+/* KEY CHANGE: Made input wrappers flexible */
+.signup-input-wrapper {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    padding: 16px;
+    background: #f0f0f0;
+    border-radius: 12px;
+    border: 1px solid transparent; /* default transparent border */
+    transition: border-color 0.2s ease;
+}
+
+.signup-input-wrapper:hover {
+    border-color: #1259EC9; /* hover stroke color */
+}
+
+.signup-input-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+}
+
+.signup-input-icon {
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0; /* Prevent icon from shrinking */
+}
+
+/* KEY CHANGE: Input now grows to fill the space */
+.signup-input {
+    width: 100%;
+    font-family: 'Roboto', Helvetica;
+    font-weight: 400;
+    color: #656565;
+    font-size: 18px;
+    letter-spacing: -0.32px;
+    line-height: 21px;
+    background: transparent;
+    border: none;
     outline: none;
-    border-color: #2563eb;
-    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
-.cta-button {
-    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+.signup-input::placeholder {
+    color: #656565;
 }
 
-.cta-button:hover {
-    transform: scale(1.02);
-    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+/* Country code dropdown */
+.signup-country-code {
+    display: flex;
+    align-items: center;
+    margin-right: 12px;
+}
+
+.signup-country-select {
+    background: transparent;
+    border: none;
+    font-family: 'Roboto', sans-serif;
+    font-size: 18px;
+    color: #656565;
+    outline: none;
+    appearance: none;
+    padding: 0;
+    margin: 0;
+}
+
+/* KEY CHANGE: Using CSS Grid for the two-column address fields */
+.signup-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    width: 100%;
+}
+
+.signup-submit-btn {
+    all: unset;
+    box-sizing: border-box;
+    display: flex;
+    width: 100%; /* Button takes full width of the form */
+    height: 66px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 0 20px;
+    background: rgba(30, 58, 97, 1);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: opacity 0.2s ease;
+}
+
+.signup-submit-btn:hover {
+    opacity: 0.9;
+}
+
+.signup-submit-text {
+    font-family: 'Roboto', Helvetica;
+    font-weight: 400;
+    color: white;
+    font-size: 24px;
+    line-height: 36px;
+    white-space: nowrap;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 900px) {
+    .signup-wrapper {
+        flex-direction: column;
+    }
+    .signup-left-panel {
+        min-height: 300px; /* Give it some height when stacked */
+        flex: unset;
+    }
+    .signup-right-panel {
+        flex: unset;
+    }
+}
+
+@media (max-width: 480px) {
+    .signup-grid {
+        grid-template-columns: 1fr; /* Stack city/country on small screens */
+    }
 }

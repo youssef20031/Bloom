@@ -1,23 +1,30 @@
 import React, { useState } from 'react';
 import './signup.style.css';
-import { User, Mail, Lock, Phone, MapPin, Globe, Map } from 'lucide-react';
+import { Phone, MapPin, Globe, Map } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
-export default function Signup() {
+export default function SignUp() {
   const navigate = useNavigate();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [street, setStreet] = useState('');
-  const [country, setCountry] = useState('');
-  const [city, setCity] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phoneNumber: '',
+    street: '',
+    city: '',
+    country: ''
+  });
   const [error, setError] = useState('');
 
-  const handleSubmit = async (e) => {
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleSubmit = async e => {
     e.preventDefault();
     setError('');
+    const { name, email, password, confirmPassword } = formData;
     if (!name || !email || !password || !confirmPassword) {
       setError('Please fill required fields');
       return;
@@ -36,8 +43,8 @@ export default function Signup() {
           password,
           companyName: name,
           contactPerson: name,
-          phone,
-          address: { street, city, country }
+          phone: formData.phoneNumber,
+          address: { street: formData.street, city: formData.city, country: formData.country }
         })
       });
       const data = await res.json();
@@ -53,102 +60,219 @@ export default function Signup() {
   };
 
   return (
-    <div className="flex min-h-screen">
-      {/* Left Side */}
-      <div className="hidden lg:flex flex-col items-center justify-center w-1/2 bg-primary text-white p-12">
-        <div className="text-center">
-          <Globe className="mx-auto h-24 w-auto text-white" />
-          <h1 className="text-5xl font-bold mt-4">BLOOM</h1>
+    <div className="signup-container">
+      <div className="signup-wrapper">
+        <div className="signup-left-panel">
+          <img
+            className="signup-illustration"
+            alt="Frame"
+            src="https://c.animaapp.com/i4ADtoMw/img/frame-1984077454.svg"
+          />
+          <div className="signup-brand">BLOOM</div>
         </div>
-      </div>
 
-      {/* Right Side */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-6 sm:p-12">
-        <div className="w-full max-w-md">
-          <h2 className="text-3xl font-bold text-gray-800 text-center">Sign Up</h2>
-          <p className="text-center text-gray-600 mt-2">
-            Let's set you up! Sign up now to get to know our special bundles and consultation services.
-          </p>
+        <div className="signup-right-panel">
+          <form onSubmit={handleSubmit} className="signup-form">
+            <header className="signup-header">
+              <h1 className="signup-title">Sign Up</h1>
+              <p className="signup-subtitle">
+                Let's set you up! Sign up now to get to know our special
+                bundles and consultation services.
+              </p>
+            </header>
 
-          <form className="mt-8 space-y-4" onSubmit={handleSubmit}>
-            <div>
-              <label htmlFor="name" className="text-sm font-medium text-gray-700">Name</label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <User className="w-5 h-5 text-gray-400" />
-                </span>
-                <input type="text" id="name" placeholder="Enter Your Name" className="form-input pl-10" value={name} onChange={e => setName(e.target.value)} />
+            <div className="signup-fields">
+              {/* Name field */}
+              <div className="signup-field">
+                <label className="signup-label" htmlFor="name-input">
+                  Name
+                </label>
+                <div className="signup-input-wrapper">
+                  <div className="signup-input-content">
+                    <img
+                      className="signup-input-icon"
+                      alt="Profile"
+                      src="https://c.animaapp.com/i4ADtoMw/img/profile.svg"
+                    />
+                    <input
+                      id="name-input"
+                      className="signup-input"
+                      type="text"
+                      placeholder="Enter Your Name"
+                      value={formData.name}
+                      onChange={e => handleInputChange('name', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label htmlFor="email" className="text-sm font-medium text-gray-700">Email</label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Mail className="w-5 h-5 text-gray-400" />
-                </span>
-                <input type="email" id="email" placeholder="Enter Your Email" className="form-input pl-10" value={email} onChange={e => setEmail(e.target.value)} />
+              {/* Email field */}
+              <div className="signup-field">
+                <label className="signup-label" htmlFor="email-input">
+                  Email
+                </label>
+                <div className="signup-input-wrapper">
+                  <div className="signup-input-content">
+                    <img
+                      className="signup-input-icon"
+                      alt="Email"
+                      src="https://c.animaapp.com/i4ADtoMw/img/email.svg"
+                    />
+                    <input
+                      id="email-input"
+                      className="signup-input"
+                      type="email"
+                      placeholder="Enter Your Email"
+                      value={formData.email}
+                      onChange={e => handleInputChange('email', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label htmlFor="password" className="text-sm font-medium text-gray-700">Password</label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Lock className="w-5 h-5 text-gray-400" />
-                </span>
-                <input type="password" id="password" placeholder="Enter Your Password" className="form-input pl-10" value={password} onChange={e => setPassword(e.target.value)} />
+              {/* Password field */}
+              <div className="signup-field">
+                <label className="signup-label" htmlFor="password-input">
+                  Password
+                </label>
+                <div className="signup-input-wrapper">
+                  <div className="signup-input-content">
+                    <svg className="signup-input-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="#656565" strokeWidth="2" />
+                      <path d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11" stroke="#656565" strokeWidth="2" />
+                    </svg>
+                    <input
+                      id="password-input"
+                      className="signup-input"
+                      type="password"
+                      placeholder="Enter Your Password"
+                      value={formData.password}
+                      onChange={e => handleInputChange('password', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label htmlFor="confirm-password" className="text-sm font-medium text-gray-700">Confirm Password</label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Lock className="w-5 h-5 text-gray-400" />
-                </span>
-                <input type="password" id="confirm-password" placeholder="Confirm Password" className="form-input pl-10" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} />
+              {/* Confirm Password field */}
+              <div className="signup-field">
+                <label className="signup-label" htmlFor="confirm-password-input">
+                  Confirm Password
+                </label>
+                <div className="signup-input-wrapper">
+                  <div className="signup-input-content">
+                    <svg className="signup-input-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="#656565" strokeWidth="2" />
+                      <path d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11" stroke="#656565" strokeWidth="2" />
+                    </svg>
+                    <input
+                      id="confirm-password-input"
+                      className="signup-input"
+                      type="password"
+                      placeholder="Confirm Password"
+                      value={formData.confirmPassword}
+                      onChange={e => handleInputChange('confirmPassword', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label htmlFor="phone" className="text-sm font-medium text-gray-700">Phone Number</label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Phone className="w-5 h-5 text-gray-400" />
-                </span>
-                <input type="tel" id="phone" placeholder="+20 Enter Your Phone Number" className="form-input pl-10" value={phone} onChange={e => setPhone(e.target.value)} />
+              {/* Phone Number field */}
+              <div className="signup-field">
+                <label className="signup-label" htmlFor="phone-input">
+                  Phone Number
+                </label>
+                <div className="signup-input-wrapper">
+                  <div className="signup-input-content">
+                    <Phone className="signup-input-icon" />
+                    <div className="signup-country-code">
+                      <select
+                        className="signup-country-select"
+                        defaultValue="+20"
+                        onChange={e => handleInputChange('phoneNumber', e.target.value)}
+                      >
+                        <option value="+20">🇪🇬 +20</option>
+                        <option value="+1">🇺🇸 +1</option>
+                        <option value="+44">🇬🇧 +44</option>
+                      </select>
+                    </div>
+                    <input
+                      id="phone-input"
+                      className="signup-input"
+                      type="tel"
+                      placeholder="Enter Your Phone Number"
+                      value={formData.phoneNumber}
+                      onChange={e => handleInputChange('phoneNumber', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div>
-              <label htmlFor="street" className="text-sm font-medium text-gray-700">Address</label>
-              <div className="relative mt-1">
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <MapPin className="w-5 h-5 text-gray-400" />
-                </span>
-                <input type="text" id="street" placeholder="Street" className="form-input pl-10" value={street} onChange={e => setStreet(e.target.value)} />
+              {/* Address field */}
+              <div className="signup-field">
+                <label className="signup-label" htmlFor="street-input">
+                  Address
+                </label>
+                <div className="signup-input-wrapper">
+                  <div className="signup-input-content">
+                    <MapPin className="signup-input-icon" />
+                    <input
+                      id="street-input"
+                      className="signup-input"
+                      type="text"
+                      placeholder="Street"
+                      value={formData.street}
+                      onChange={e => handleInputChange('street', e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="relative">
-                <input type="text" placeholder="Country" className="form-input pl-10" value={country} onChange={e => setCountry(e.target.value)} />
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Globe className="w-5 h-5 text-gray-400" />
-                </span>
-              </div>
-              <div className="relative">
-                <input type="text" placeholder="City" className="form-input pl-10" value={city} onChange={e => setCity(e.target.value)} />
-                <span className="absolute inset-y-0 left-0 flex items-center pl-3">
-                  <Map className="w-5 h-5 text-gray-400" />
-                </span>
+              <div className="signup-grid">
+                {/* Country field */}
+                <div className="signup-field">
+                  <div className="signup-input-wrapper">
+                    <div className="signup-input-content">
+                      <Globe className="signup-input-icon" />
+                      <input
+                        className="signup-input"
+                        type="text"
+                        placeholder="Country"
+                        value={formData.country}
+                        onChange={e => handleInputChange('country', e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* City field */}
+                <div className="signup-field">
+                  <div className="signup-input-wrapper">
+                    <div className="signup-input-content">
+                      <Map className="signup-input-icon" />
+                      <input
+                        className="signup-input"
+                        type="text"
+                        placeholder="City"
+                        value={formData.city}
+                        onChange={e => handleInputChange('city', e.target.value)}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
 
             {error && <p className="text-red-600 text-sm">{error}</p>}
-            <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-md font-semibold hover:bg-blue-700 cta-button">
-              Sign Up
+            <button type="submit" className="signup-submit-btn">
+              <span className="signup-submit-text">Sign Up</span>
             </button>
           </form>
         </div>

@@ -1,19 +1,9 @@
-import express from 'express';
-import bcrypt from 'bcryptjs';
 import Customer from '../models/customer.js';
 import SupportTicket from '../models/supportTicket.js';
 import User from '../models/user.js';
 import Product from '../models/product.js';
 import Service from '../models/service.js'; // Import Service model
 import mongoose from 'mongoose';
-
-// Helper to format user response
-const formatUserResponse = (user) => ({
-    id: user._id,
-    name: user.name,
-    email: user.email,
-    role: user.role
-});
 
 /* ===============================
    CUSTOMER MANAGEMENT
@@ -255,32 +245,15 @@ export const getCustomerTickets = async (req, res) => {
 export const signupCustomer = async (req, res) => {
   try {
     const { name, email, password, companyName, contactPerson, phone, address } = req.body;
-
-    // 1. Create the user
-    const hashed = await bcrypt.hash(password, 10);
-    const user = new User({
-      name,
-      email,
-      password: hashed,
-      role: 'customer'
-    });
+    // 1. Create the user (password will be hashed by pre-save hook)
+    const user = new User({ name, email, password, role: 'customer' });
     await user.save();
 
     // 2. Create the customer linked to the user
-    const customer = new Customer({
-      userId: user._id,
-      companyName,
-      contactPerson,
-      phone,
-      address
-    });
+    const customer = new Customer({ userId: user._id, companyName, contactPerson, phone, address });
     await customer.save();
 
-    res.status(201).json({
-      message: 'Customer registered successfully',
-      user,
-      customer
-    });
+    res.status(201).json({ message: 'Customer registered successfully', user, customer });
   } catch (err) {
     res.status(400).json({ error: err.message });
   }
