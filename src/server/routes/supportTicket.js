@@ -1,12 +1,12 @@
 import express from 'express';
 import {
-  createSupportTicket,
-  getSupportTicket,
-  addTicketMessage,
-  listSupportTickets,
-  updateTicketStatus,
-  assignSupportAgent,
-  deleteSupportTicket
+    createSupportTicket,
+    getSupportTicket,
+    addTicketMessage,
+    listSupportTickets,
+    updateTicketStatus,
+    assignSupportAgent,
+    deleteSupportTicket
 } from '../controllers/supportTicket.js';
 
 const router = express.Router();

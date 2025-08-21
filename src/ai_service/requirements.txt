@@ -1,0 +1,12 @@
+google-generativeai
+langchain-google-genai
+langchain
+langchain-core
+langchain-community
+pypdf
+chromadb
+Flask
+flask-cors
+gunicorn
+python-docx
+reportlab

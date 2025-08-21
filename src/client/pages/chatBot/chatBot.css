@@ -1,0 +1,290 @@
+/* ==========================================================================
+   ChatBot Component Styles
+   - Scoped to .chatbot-wrapper to prevent global conflicts.
+   - Combines layout, chat window, and detailed input styles.
+   ========================================================================== */
+
+/* --- 1. Main Layout & Structure --- */
+
+.chatbot-wrapper .app-container {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    height: 100vh;
+    width: 100vw;
+    background: white;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.chatbot-wrapper .sidebar {
+    border-right: 1px solid #e5e7eb;
+    padding: 12px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.chatbot-wrapper .main-content-area {
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Hides the inactive view */
+.chatbot-wrapper .hidden {
+    display: none !important;
+}
+
+/* ==========================================================================
+   1b. FLEXBOX LAYOUT FOR PUSH-UP EFFECT (KEY EDITS HERE)
+   ========================================================================== */
+
+/* This container holds the header, chat window, and input area */
+.chatbot-wrapper .content,
+.chatbot-wrapper .report-view {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    /* --- EDIT: Added height and overflow to create a containing block --- */
+    height: 100%;
+    overflow: hidden;
+}
+
+/* --- EDIT: The following rules ensure the correct flex behavior --- */
+
+/* Child 1: The Header (Fixed Size) */
+.chatbot-wrapper .app-header {
+    flex-shrink: 0; /* Prevents the header from shrinking */
+}
+
+/* Child 2: The Chat Window (Flexible) */
+.chatbot-wrapper .chat-window {
+    flex: 1; /* Allows the chat window to grow and shrink to fill space */
+    min-height: 0; /* A crucial flexbox fix for scrolling content */
+}
+
+/* Child 3: The Input Area (Fixed Size) */
+.chatbot-wrapper .input-area {
+    flex-shrink: 0; /* Prevents the input area from shrinking */
+}
+
+
+/* ==========================================================================
+   2. Header
+   ========================================================================== */
+
+.chatbot-wrapper .app-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background-color: #ffffff;
+    color: #1f2937;
+}
+
+.chatbot-wrapper .app-header h1 {
+    font-size: 1.25rem;
+    line-height: 1.5;
+    margin: 0;
+}
+
+
+/* ==========================================================================
+   3. Session List & Badges (in Sidebar)
+   ========================================================================== */
+
+.chatbot-wrapper .session-list-header { font-weight: 600; margin-bottom: 8px; }
+.chatbot-wrapper .session-list ul { list-style: none; padding: 0; margin: 0; }
+.chatbot-wrapper .session-item { padding: 8px; border-radius: 6px; cursor: pointer; border: 1px solid transparent; display:flex; flex-direction: column; gap:4px; }
+.chatbot-wrapper .session-item:hover { background: #f8fafc; border-color: #e5e7eb; }
+.chatbot-wrapper .session-item.active { background: #eef2ff; border-color: #c7d2fe; }
+.chatbot-wrapper .session-item .title { font-size: 14px; font-weight: 600; }
+.chatbot-wrapper .session-item .meta { font-size: 12px; color: #6b7280; }
+
+.chatbot-wrapper .badge { display: inline-block; padding: 2px 8px; border-radius: 9999px; font-size: 12px; font-weight: 600;}
+.chatbot-wrapper .status-active { background: #ecfeff; color: #0e7490; border: 1px solid #a5f3fc; }
+.chatbot-wrapper .status-completed { background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; }
+
+
+/* ==========================================================================
+   4. Chat Window & Messages
+   ========================================================================== */
+
+.chatbot-wrapper .chat-window {
+    overflow-y: auto;
+    padding: 16px;
+    background: #f9fafb;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.chatbot-wrapper .message {
+    max-width: 80%;
+    padding: 10px 15px;
+    border-radius: 18px;
+    word-wrap: break-word;
+    line-height: 1.5;
+}
+
+.chatbot-wrapper .message.user {
+    background-color: #dbeafe;
+    color: #1f2937;
+    align-self: flex-end;
+    border-bottom-right-radius: 4px;
+}
+
+.chatbot-wrapper .message.bot {
+    background-color: #ffffff;
+    color: #333;
+    align-self: flex-start;
+    border: 1px solid #e5e7eb;
+    border-bottom-left-radius: 4px;
+    text-align: left;
+}
+
+/* Markdown Formatting for Chat Messages */
+.chatbot-wrapper .message p { margin: 0 0 0.5em 0; }
+.chatbot-wrapper .message p:last-child { margin-bottom: 0; }
+.chatbot-wrapper .message ul, .chatbot-wrapper .message ol { margin: 0.5em 0; padding-left: 25px; }
+.chatbot-wrapper .message li { margin-bottom: 0.3em; }
+.chatbot-wrapper .message strong { font-weight: 700; }
+
+
+/* ==========================================================================
+   5. Chat Input Area (ContentEditable Version)
+   ========================================================================== */
+
+.chatbot-wrapper .input-area {
+    display: flex;
+    gap: 8px;
+    padding: 20px;
+    border-top: 1px solid #e5e7eb;
+    align-items: flex-end;
+    background-color: #ffffff;
+}
+
+.chatbot-wrapper .input-wrapper {
+    position: relative;
+    flex-grow: 1;
+    display: flex;
+    background-color: white;
+    border: 1px solid #d1d5db;
+    border-radius: 25px;
+    padding: 10px;
+    margin-bottom: 2px;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.chatbot-wrapper .input-wrapper:focus-within {
+    border-color: #242424;
+    box-shadow: 0 0 0 2px rgba(36, 36, 36, 0.2);
+}
+
+.chatbot-wrapper .chat-input-editable {
+    width: 100%;
+    min-height: 24px;
+    max-height: 200px;
+    overflow-y: auto;
+    padding: 2px 85px 2px 10px;
+    line-height: 1.5;
+    word-wrap: break-word;
+    outline: none;
+    cursor: text;
+    color: #242424;
+}
+
+.chatbot-wrapper .chat-input-editable:empty::before {
+    content: attr(data-placeholder);
+    color: #9ca3af;
+    cursor: text;
+    pointer-events: none;
+}
+
+.chatbot-wrapper .send-button {
+    position: absolute;
+    right: 8px;
+    bottom: 5px;
+    background-color: #242424;
+    color: white;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    padding: 6px 14px;
+    border-radius: 25px;
+    cursor: pointer;
+}
+
+.chatbot-wrapper .send-button:hover {
+    background-color: white;
+    border-color: #242424;
+    color: #242424;
+}
+
+.chatbot-wrapper .send-button:disabled {
+    background-color: #a0a0a0;
+    border-color: #a0a0a0;
+    color: white;
+    cursor: not-allowed;
+}
+
+.chatbot-wrapper .exit-button {
+    background: #d12700;
+    color: white;
+    white-space: nowrap;
+    transition: background-color 0.2s;
+    margin-bottom: 5px;
+    padding: 10px 20px;
+    border-radius: 20px;
+    border: 1px solid transparent;
+    cursor: pointer;
+}
+
+.chatbot-wrapper .exit-button:hover {
+    background-color: #a81f00;
+}
+
+.chatbot-wrapper .exit-button:disabled {
+    background-color: #a0a0a0;
+    cursor: not-allowed;
+}
+
+
+/* ==========================================================================
+   6. Report View
+   ========================================================================== */
+
+.chatbot-wrapper .report-content {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    padding: 25px;
+    flex-grow: 1;
+    overflow-y: auto;
+    text-align: left;
+    color: #333;
+}
+
+.chatbot-wrapper .report-view button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    border-radius: 5px;
+    border: none;
+    background-color: #0076ce;
+    color: white;
+    font-size: 16px;
+    cursor: pointer;
+    align-self: center;
+}
+
+/* Markdown Formatting for Report */
+.chatbot-wrapper .report-markdown h1,
+.chatbot-wrapper .report-markdown h2,
+.chatbot-wrapper .report-markdown h3,
+.chatbot-wrapper .report-markdown strong {
+    color: #333;
+}
+.chatbot-wrapper .report-markdown p { line-height: 1.6; margin-bottom: 1em; }
+.chatbot-wrapper .report-markdown ul,
+.chatbot-wrapper .report-markdown ol { padding-left: 25px; margin-bottom: 1em; }
+.chatbot-wrapper .report-markdown li { margin-bottom: 0.5em; }
