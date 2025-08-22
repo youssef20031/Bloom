@@ -1,16 +1,14 @@
-import React from 'react';
-import { useEffect, useMemo, useState } from 'react';
-import axios from 'axios';
-import './adminview.css';
+import React, { useState, useEffect } from "react";
+import axios from "axios";
+import "./adminview.css";
+import BloomLogo from "../../assets/Bloom_Logo.svg";
+const api = axios.create({ baseURL: "http://localhost:3000/api" });
+const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
 
-// --- Axios instance for API calls ---
-const api = axios.create({ baseURL: 'http://localhost:3000/api' });
-
-function Badge({ variant = 'muted', children }) {
-    return <span className={`badge ${variant}`}>{children || 'N/A'}</span>;
+function Badge({ variant = "muted", children }) {
+    return <span className={`status-badge ${variant}`}>{children}</span>;
 }
 
-// --- Modal Component ---
 function Modal({ open, onClose, title, children }) {
     if (!open) return null;
     return (
@@ -28,252 +26,1044 @@ function Modal({ open, onClose, title, children }) {
     );
 }
 
-function usePagination(items, pageSize) {
-    const [page, setPage] = useState(1);
-    const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-
-    useEffect(() => {
-        if (page > totalPages) {
-            setPage(totalPages);
-        }
-    }, [items.length, pageSize, page, totalPages]);
-
-    const pageItems = useMemo(() => {
-        const start = (page - 1) * pageSize;
-        return items.slice(start, start + pageSize);
-    }, [items, page, pageSize]);
-
-    return { page, setPage, totalPages, pageItems };
-}
-
-export default function Adminview() {
-    const [customers, setCustomers] = useState([]);
+export default function Dashboard() {
+    const [currentView, setCurrentView] = useState("Customer");
+    const [entities, setEntities] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [selected, setSelected] = useState(null);
+    const [pageSize, setPageSize] = useState(5);
+    const [page, setPage] = useState(1);
+    const [modalType, setModalType] = useState(null); // "details" | "employee" | "product" | "dc" | "service" | null
+    const [newEmployee, setNewEmployee] = useState({
+        name: "",
+        email: "",
+        password: "",
+        role: "admin", // default role
+    });
+    const [employeeErrors, setEmployeeErrors] = useState({});
+    // Product form state + errors (single modal pattern)
+    const initialProduct = {
+        name: "",
+        description: "",
+        type: "",
+        vendor: "",
+        specifications: {}, // kept as object; we'll edit via a JSON textarea string
+        stock: "",
+        price: "",
+        serialNumber: "",
+        model: "",
+        location: { datacenter: "", rack: "", position: "" },
+        status: "available",
+        purchaseDate: "",
+        warrantyExpiry: "",
+        lastMaintenance: "",
+        nextMaintenance: "",
+        notes: "",
+        tags: [],
+    };
+    const [newProduct, setNewProduct] = useState(initialProduct);
+    const [productErrors, setProductErrors] = useState({});
+    // text area helper for specifications JSON
+    const [specText, setSpecText] = useState("");
+    const [newDC, setNewDC] = useState({
+        location: "",
+        assetType: "",
+        assetId: "",
+        customerId: ""
+    });
+    const [dcErrors, setDcErrors] = useState({});
+    const [products, setProducts] = useState([]);
+    const [customers, setCustomers] = useState([]);
+    const [newService, setNewService] = useState({
+        name: "",
+        description: "",
+        type: "",
+        associatedProducts: [],
+        hostingDetails: { datacenterLocation: "", vmSpecs: {} },
+        customerId: "",
+        ipAddress: "",
+    });
 
-    const [pageSize, setPageSize] = useState(3);
-    const { page, setPage, totalPages, pageItems } = usePagination(
-        customers,
-        pageSize
-    );
+    const [serviceErrors, setServiceErrors] = useState({});
+    const validateService = () => {
+        const errors = {};
+        if (!newService.name?.trim()) errors.name = "Name is required.";
+        if (!newService.type) errors.type = "Type is required.";
 
+        // If customer is chosen, IP address becomes required
+        if (newService.customerId && !newService.ipAddress?.trim()) {
+            errors.ipAddress = "IP Address is required when assigning to a customer.";
+        }
+
+        // Validate associatedProducts
+        if (newService.associatedProducts?.length > 0) {
+            newService.associatedProducts.forEach((p, idx) => {
+                if (!p.productId) {
+                    errors[`product-${idx}`] = "Product selection is required.";
+                }
+                if (!p.quantity || parseInt(p.quantity, 10) <= 0) {
+                    errors[`quantity-${idx}`] = "Quantity must be at least 1.";
+                }
+            });
+        }
+
+        return errors;
+    };
+
+    const toName = (idOrObj) =>
+        typeof idOrObj === "string" ? idOrObj : idOrObj?.name || idOrObj?._id || "";
+
+    // fetch customers only if Customer view is selected
     useEffect(() => {
         let mounted = true;
-        (async () => {
+
+        const fetchData = async () => {
             try {
                 setLoading(true);
                 setError(null);
-                const res = await api.get('/customers');
-                if (!mounted) return;
-                setCustomers(res.data || []);
+
+                if (currentView === "Customer") {
+                    const res = await api.get("/customers");
+                    if (mounted) setEntities(res.data || []);
+                }
+
+                if (currentView === "Employee") {
+                    const roles = ["admin", "presales", "support", "it"];
+                    let employees = [];
+                    for (const role of roles) {
+                        const res = await api.get(`/users/role/${role}`);
+                        employees = employees.concat(res.data || []);
+                    }
+                    if (mounted) setEntities(employees);
+                }
+                if (currentView === "DC") {
+                    const res = await api.get("/datacenter");
+                    if (mounted) setEntities(res.data || []);
+                    const prodRes = await api.get("/products");
+                    const custRes = await api.get("/customers");
+                    if (mounted) {
+                        setProducts(prodRes.data || []);
+                        setCustomers(custRes.data || []);
+                    }
+                }
+                if (currentView === "Product") {
+                    const res = await api.get("/products");
+                    if (mounted) setEntities(res.data || []);
+                }
+                if (currentView === "Service") {
+                    const res = await api.get("/service");
+                    const prodRes = await api.get("/products");
+                    const custRes = await api.get("/customers");
+                    if (mounted) {
+                        setEntities(res.data || []);
+                        setProducts(prodRes.data || []);
+                        setCustomers(custRes.data || []);
+                    }
+                }
+                // Later: add Product, Service, DC fetches here
             } catch (e) {
-                if (!mounted) return;
-                setError(
-                    e?.response?.data?.message || e?.message || 'Failed to load customers'
-                );
+                setError(e?.response?.data?.message || e?.message || "Failed to load data");
             } finally {
-                if (mounted) {
-                    setLoading(false);
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+        return () => { mounted = false; };
+    }, [currentView]);
+    const handleSaveEmployee = async () => {
+        let errors = {};
+
+        if (!newEmployee.name.trim()) {
+            errors.name = "Name is required";
+        }
+        if (!newEmployee.email.trim()) {
+            errors.email = "Email is required";
+        }
+        if (!newEmployee.password.trim()) {
+            errors.password = "Password is required";
+        }
+        if (!newEmployee.role) {
+            errors.role = "Role is required";
+        }
+
+        setEmployeeErrors(errors);
+
+        // Stop if there are errors
+        if (Object.keys(errors).length > 0) return;
+
+        try {
+            await api.post("/users", newEmployee);
+            // Refresh employees
+            const roles = ["admin", "presales", "support", "it"];
+            let employees = [];
+            for (const role of roles) {
+                const res = await api.get(`/users/role/${role}`);
+                employees = employees.concat(res.data || []);
+            }
+            setEntities(employees);
+
+            // Reset form + close modal
+            setNewEmployee({ name: "", email: "", password: "", role: "admin" });
+            setEmployeeErrors({});
+            setModalType(null);
+        } catch (e) {
+            setEmployeeErrors({ general: e?.response?.data?.message || e.message });
+        }
+    };
+    const handleSaveProduct = async () => {
+        // inline validation
+        const errs = {};
+        if (!newProduct.name.trim()) errs.name = "Name is required.";
+        if (!newProduct.type) errs.type = "Type is required.";
+        if (newProduct.stock === "" || Number.isNaN(Number(newProduct.stock))) errs.stock = "Stock is required.";
+        if (newProduct.price === "" || Number.isNaN(Number(newProduct.price))) errs.price = "Price is required.";
+
+        // specifications JSON
+        let parsedSpecs = {};
+        if (specText.trim() !== "") {
+            try {
+                parsedSpecs = JSON.parse(specText);
+            } catch {
+                errs.specifications = "Invalid JSON format";
+            }
+        }
+
+        setProductErrors(errs);
+        if (Object.keys(errs).length) return;
+
+        const payload = {
+            ...newProduct,
+            stock: Number(newProduct.stock),
+            price: Number(newProduct.price),
+            specifications: parsedSpecs,
+            // convert empty strings to undefined for optional fields if you want cleaner payloads:
+            serialNumber: newProduct.serialNumber || undefined,
+            model: newProduct.model || undefined,
+            location: {
+                datacenter: newProduct.location.datacenter || undefined,
+                rack: newProduct.location.rack || undefined,
+                position: newProduct.location.position || undefined,
+            },
+            notes: newProduct.notes || undefined,
+            tags: (newProduct.tags || []).filter(Boolean),
+        };
+
+        try {
+            const res = await api.post("/products", payload);
+            // optimistically update list if you're on Product view
+            if (currentView === "Product") {
+                setEntities((prev) => [res.data, ...prev]);
+            }
+            // reset + close modal
+            setNewProduct(initialProduct);
+            setSpecText("{}");
+            setProductErrors({});
+            setModalType(null);
+        } catch (err) {
+            setProductErrors((p) => ({
+                ...p,
+                general: err?.response?.data?.message || err.message || "Failed to add product",
+            }));
+        }
+    };
+    const handleSaveDC = async () => {
+        let errors = {};
+        if (!newDC.location) errors.location = "Location is required";
+        if (!newDC.assetType) errors.assetType = "Asset type is required";
+
+        setDcErrors(errors);
+        if (Object.keys(errors).length > 0) return;
+        const payload = {
+            location: newDC.location,
+            assetType: newDC.assetType,
+            assetId: newDC.assetId || undefined,
+            customerId: newDC.customerId || undefined,
+        };
+
+        Object.keys(payload).forEach((key) => {
+            if (payload[key] === "" || payload[key] === undefined) {
+                delete payload[key];
+            }
+        });
+
+
+        try {
+            const res = await api.post("/datacenter", payload);
+            const getres = await api.get("/datacenter");
+            setEntities(getres.data || []);
+            setModalType(null);
+            setNewDC({ location: "", assetType: "", assetId: "", customerId: "" });
+            setDcErrors({});
+        } catch (e) {
+            setDcErrors({ general: e?.response?.data?.message || "Failed to save datacenter" });
+        }
+    };
+    const handleSaveService = async () => {
+        // Build base payload
+        const errors = validateService();
+        if (Object.keys(errors).length > 0) {
+            setServiceErrors(errors);
+            return;
+        }
+        setServiceErrors({}); // clear old errors
+        let payload = {
+            name: newService.name,
+            description: newService.description,
+            type: newService.type,
+            hostingDetails: {
+                datacenterLocation: newService.datacenterLocation,
+                vmSpecs: newService.vmSpecs
+            }
+        };
+
+        // Expand associated products based on quantity
+        if (newService.associatedProducts && newService.associatedProducts.length > 0) {
+            let expanded = [];
+            newService.associatedProducts.forEach((p) => {
+                const qty = parseInt(p.quantity, 10) || 1;
+                for (let i = 0; i < qty; i++) {
+                    expanded.push(p.productId);
+                }
+            });
+            payload.associatedProducts = expanded;
+        }
+
+        // Clean empty fields
+        Object.keys(payload).forEach((key) => {
+            if (payload[key] === "" || payload[key] === undefined) {
+                delete payload[key];
+            }
+        });
+
+        try {
+            const res = await api.post("/service", payload);
+
+            // If service is linked to a customer
+            if (newService.customerId) {
+                await api.post("/customers/add-service", {
+                    customerId: newService.customerId,
+                    serviceId: res.data._id,
+                    ipAddress: newService.ipAddress || ""
+                });
+
+                // Add purchased products for the customer one by one
+                for (const p of newService.associatedProducts) {
+                    const qty = parseInt(p.quantity, 10) || 1;
+                    await api.post("/customers/add-product", {
+                        customerId: newService.customerId,
+                        productId: p.productId,
+                        quantity: qty
+                    });
                 }
             }
-        })();
-        return () => {
-            mounted = false;
-        };
-    }, []);
 
-    const toName = (idOrObj) =>
-        typeof idOrObj === 'string'
-            ? idOrObj
-            : idOrObj?.name || idOrObj?._id || '';
+            // refresh table
+            const refreshed = await api.get("/service");
+            setEntities(refreshed.data || []);
+            setModalType(null);
+            setNewService({});
+        } catch (err) {
+            console.error("Error saving service", err);
+        }
+    };
+
+
+    // paginate
+    const totalPages = Math.max(1, Math.ceil(entities.length / pageSize));
+    const pageItems = entities.slice((page - 1) * pageSize, page * pageSize);
 
     return (
         <div className="dashboard">
-            <div className="header">
-                <div className="header-left">
-                    <h1 className="logo">BLOOM</h1>
-                    <h2>Welcome Back, Radwan</h2>
+            {/* Header */}
+            <header className="header">
+                <div className="header-content">
+                    <div className="header-left">
+                        <img src={BloomLogo} alt="Bloom Logo" className="logo-img" />
+                        <nav className="main-nav">
+                            <a href="#" className="nav-link">Home</a>
+                            <a href="#" className="nav-link">Services</a>
+                            <a href="#" className="nav-link">Support</a>
+                            <a href="#" className="nav-link">More Info ▼</a>
+                        </nav>
+                    </div>
                 </div>
-            </div>
-
-            {/* --- Navigation moved up --- */}
-            <div className="top-nav">
-                <button>Home</button>
-                <button>Services</button>
-                <button>Support</button>
-                <button>More Info</button>
-            </div>
+            </header>
 
             <div className="main-content">
-                <div className="entity-filters">
-                    <div>
-                        {['Customer', 'Employee', 'DC', 'Product', 'Service'].map(
-                            (view) => (
-                                <button
-                                    key={view}
-                                    className={view === 'Customer' ? 'active' : ''}
-                                >
-                                    {view}
-                                </button>
-                            )
-                        )}
-                    </div>
-                    <button className="add-button">Add +</button>
+                {/* Welcome Section */}
+                <div className="welcome-section">
+                    <h2 className="welcome-title">Welcome Back, {user?.name || 'Admin'}</h2>
                 </div>
 
-                <div className="table-container">
-                    <div className="table-controls">
-                        <div className="rows-selector">
-                            <span>Show</span>
-                            <select
-                                value={pageSize}
-                                onChange={(e) => {
-                                    setPageSize(Number(e.target.value));
-                                    setPage(1);
+                {/* Entity Filters */}
+                <div className="entity-filters">
+                    <div className="tab-buttons">
+                        {["Customer", "Employee", "DC", "Product", "Service"].map((view) => (
+                            <button
+                                key={view}
+                                className={`tab-button ${currentView === view ? "active" : ""}`}
+                                onClick={() => {
+                                    setCurrentView(view);
+                                    setSelected(null);
                                 }}
                             >
-                                {[3, 5, 10, 20].map((n) => (
-                                    <option key={n} value={n}>
-                                        {n}
-                                    </option>
-                                ))}
-                            </select>
-                            <span>Row</span>
-                        </div>
-                    </div>
-
-                    <div className="table-wrapper">
-                        <table>
-                            <thead>
-                            <tr>
-                                <th>Customer Name</th>
-                                <th>Hosting Status</th>
-                                <th>Purchased Service</th>
-                                <th>Status</th>
-                                <th>Purchased Product</th>
-                                <th>Status</th>
-                                <th>Price</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {loading && (
-                                <tr>
-                                    <td colSpan={7} className="loading">
-                                        Loading...
-                                    </td>
-                                </tr>
-                            )}
-                            {error && !loading && (
-                                <tr>
-                                    <td colSpan={7} className="error">
-                                        {error}
-                                    </td>
-                                </tr>
-                            )}
-                            {!loading && !error && pageItems.length === 0 && (
-                                <tr>
-                                    <td colSpan={7} className="empty">
-                                        No customers found.
-                                    </td>
-                                </tr>
-                            )}
-                            {!loading &&
-                                !error &&
-                                pageItems.map((c) => {
-                                    const firstService = (c.purchasedServices || [])[0];
-                                    const firstProduct = (c.purchasedProducts || [])[0];
-
-                                    const hostingVariant =
-                                        c.hostingStatus?.toLowerCase() === 'active'
-                                            ? 'success'
-                                            : 'muted';
-                                    const serviceStatusVariant =
-                                        firstService?.status?.toLowerCase() === 'active'
-                                            ? 'success'
-                                            : firstService?.status?.toLowerCase() === 'expired'
-                                                ? 'danger'
-                                                : 'muted';
-                                    const productStatusVariant =
-                                        firstProduct?.status?.toLowerCase() === 'active'
-                                            ? 'success'
-                                            : 'muted';
-
-                                    return (
-                                        <tr key={c._id} onClick={() => setSelected(c)}>
-                                            <td>{c.companyName}</td>
-                                            <td>
-                                                <Badge variant={hostingVariant}>
-                                                    {c.hostingStatus}
-                                                </Badge>
-                                            </td>
-                                            <td className="service-name-cell">
-                                                {firstService
-                                                    ? toName(firstService.serviceId)
-                                                    : 'N/A'}
-                                            </td>
-                                            <td>
-                                                <Badge variant={serviceStatusVariant}>
-                                                    {firstService?.status}
-                                                </Badge>
-                                            </td>
-                                            <td>
-                                                {firstProduct
-                                                    ? `${firstProduct.quantity || ''} ${toName(
-                                                        firstProduct.productId
-                                                    )}`.trim()
-                                                    : 'N/A'}
-                                            </td>
-                                            <td>
-                                                <Badge variant={productStatusVariant}>
-                                                    {firstProduct?.status}
-                                                </Badge>
-                                            </td>
-                                            <td>{c.price || 'N/A'}</td>
-                                        </tr>
-                                    );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    {!loading && !error && customers.length > 0 && (
-                        <div className="pagination">
-                            <button
-                                onClick={() => setPage(Math.max(1, page - 1))}
-                                disabled={page === 1}
-                            >
-                                {'<'}
+                                {view}
                             </button>
-                            {Array.from({ length: totalPages }, (_, i) => i + 1)
-                                .slice(0, 5)
-                                .map((n) => (
-                                    <button
-                                        key={n}
-                                        onClick={() => setPage(n)}
-                                        className={n === page ? 'active' : ''}
-                                    >
-                                        {n}
-                                    </button>
-                                ))}
-                            <button
-                                onClick={() => setPage(Math.min(totalPages, page + 1))}
-                                disabled={page === totalPages}
-                            >
-                                {'>'}
-                            </button>
-                        </div>
-                    )}
+                        ))}
+                    </div>
+                    <button className="add-button" onClick={() => {
+                        setSelected(null);
+                        if (currentView === "Employee") {
+                            setNewEmployee({ name: "", email: "", password: "", role: "" });
+                        }
+                        setModalType(currentView.toLowerCase()); // "employee", "product", "dc", "service"
+
+                    }}
+                        disabled={currentView === "Customer"}
+                    >Add +</button>
                 </div>
+
+                {/* Conditional Rendering by currentView */}
+                {currentView === "Customer" && (
+                    <div className="table-container">
+                        <div className="table-wrapper">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Customer Name</th>
+                                        <th>Hosting Status</th>
+                                        <th>Purchased Service</th>
+                                        <th>Status</th>
+                                        <th>Purchased Product</th>
+                                        <th>Status</th>
+                                        <th>Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading && (
+                                        <tr>
+                                            <td colSpan={7} className="loading">
+                                                Loading...
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {error && !loading && (
+                                        <tr>
+                                            <td colSpan={7} className="error">
+                                                {error}
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={7} className="empty">
+                                                No customers found.
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {!loading &&
+                                        !error &&
+                                        pageItems.map((c) => {
+                                            const firstService = (c.purchasedServices || [])[0];
+                                            const firstProduct = (c.purchasedProducts || [])[0];
+
+                                            const hostingVariant =
+                                                c.hostingStatus?.toLowerCase() === "active"
+                                                    ? "success"
+                                                    : "danger";
+                                            const serviceStatusVariant =
+                                                firstService?.status?.toLowerCase() === "active"
+                                                    ? "success"
+                                                    : firstService?.status?.toLowerCase() === "expired"
+                                                        ? "danger"
+                                                        : "muted";
+                                            const productStatusVariant =
+                                                firstProduct?.status?.toLowerCase() === "active"
+                                                    ? "success"
+                                                    : "muted";
+
+                                            return (
+                                                <tr key={c._id || c.id} onClick={() => {
+                                                    setSelected(c);
+                                                    setModalType("details");
+                                                }} className="table-row">
+                                                    <td className="customer-name">{c.companyName}</td>
+                                                    <td>
+                                                        <Badge variant={hostingVariant}>
+                                                            {c.hostingStatus}
+                                                        </Badge>
+                                                    </td>
+                                                    <td className="service-name">
+                                                        {firstService ? toName(firstService.serviceId) : "N/A"}
+                                                    </td>
+                                                    <td>
+                                                        {firstService && (
+                                                            <Badge variant={serviceStatusVariant}>
+                                                                {firstService.status}
+                                                            </Badge>
+                                                        )}
+                                                    </td>
+                                                    <td>
+                                                        {firstProduct
+                                                            ? `${firstProduct.quantity || ""} ${toName(
+                                                                firstProduct.productId
+                                                            )}`.trim()
+                                                            : "N/A"}
+                                                    </td>
+                                                    <td>
+                                                        {firstProduct && (
+                                                            <Badge variant={productStatusVariant}>
+                                                                {firstProduct.status}
+                                                            </Badge>
+                                                        )}
+                                                    </td>
+                                                    <td className="price">{c.price || "N/A"}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {!loading && !error && entities.length > 0 && (
+                            <div className="pagination-container">
+                                <div className="pagination-info">
+                                    <span>Show</span>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setPageSize(Number(e.target.value));
+                                            setPage(1);
+                                        }}
+                                        className="page-size-select"
+                                    >
+                                        {[3, 5, 10, 20].map((n) => (
+                                            <option key={n} value={n}>
+                                                {n}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span>Row</span>
+                                </div>
+                                <div className="pagination">
+                                    <button
+                                        onClick={() => setPage(Math.max(1, page - 1))}
+                                        disabled={page === 1}
+                                        className="page-btn"
+                                    >
+                                        {"<"}
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .slice(0, 5)
+                                        .map((n) => (
+                                            <button
+                                                key={n}
+                                                onClick={() => setPage(n)}
+                                                className={`page-btn ${n === page ? "active" : ""}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    {totalPages > 5 && (
+                                        <>
+                                            <span className="page-dots">...</span>
+                                            <button
+                                                onClick={() => setPage(totalPages)}
+                                                className="page-btn"
+                                            >
+                                                {totalPages}
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                        disabled={page === totalPages}
+                                        className="page-btn"
+                                    >
+                                        {">"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {currentView === "Employee" && (
+                    <div className="table-container">
+                        <div className="table-wrapper">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Email</th>
+                                        <th>Role</th>
+                                        <th>Created At</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading && (
+                                        <tr>
+                                            <td colSpan={4} className="loading">Loading...</td>
+                                        </tr>
+                                    )}
+                                    {error && !loading && (
+                                        <tr>
+                                            <td colSpan={4} className="error">{error}</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={4} className="empty">No employees found.</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.map((emp) => (
+                                        <tr key={emp._id} onClick={() => {
+                                            setSelected(emp);
+                                            setModalType("details");
+                                        }} className="table-row">
+                                            <td>{emp.name}</td>
+                                            <td>{emp.email}</td>
+                                            <td>
+                                                {emp.role}
+                                            </td>
+                                            <td>{new Date(emp.createdAt).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination same as Customers */}
+                        {!loading && !error && entities.length > 0 && (
+                            <div className="pagination-container">
+                                <div className="pagination-info">
+                                    <span>Show</span>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setPageSize(Number(e.target.value));
+                                            setPage(1);
+                                        }}
+                                        className="page-size-select"
+                                    >
+                                        {[3, 5, 10, 20].map((n) => (
+                                            <option key={n} value={n}>
+                                                {n}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span>Row</span>
+                                </div>
+                                <div className="pagination">
+                                    <button
+                                        onClick={() => setPage(Math.max(1, page - 1))}
+                                        disabled={page === 1}
+                                        className="page-btn"
+                                    >
+                                        {"<"}
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .slice(0, 5)
+                                        .map((n) => (
+                                            <button
+                                                key={n}
+                                                onClick={() => setPage(n)}
+                                                className={`page-btn ${n === page ? "active" : ""}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    {totalPages > 5 && (
+                                        <>
+                                            <span className="page-dots">...</span>
+                                            <button
+                                                onClick={() => setPage(totalPages)}
+                                                className="page-btn"
+                                            >
+                                                {totalPages}
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                        disabled={page === totalPages}
+                                        className="page-btn"
+                                    >
+                                        {">"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+
+                {currentView === "DC" && (
+                    <div className="table-container">
+                        <div className="table-wrapper">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Location</th>
+                                        <th>Asset Type</th>
+                                        <th>Asset</th>
+                                        <th>Customer</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading && (
+                                        <tr>
+                                            <td colSpan={4} className="loading">Loading...</td>
+                                        </tr>
+                                    )}
+                                    {error && !loading && (
+                                        <tr>
+                                            <td colSpan={4} className="error">{error}</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={4} className="empty">No datacenter assets found.</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.map((dc) => (
+                                        <tr key={dc._id} onClick={() => {
+                                            setSelected(dc);
+                                            setModalType("details");
+                                        }} className="table-row">
+                                            <td>{dc.location}</td>
+                                            <td>{dc.assetType}</td>
+                                            <td>{dc.assetId?.name || dc.assetId?._id || "N/A"}</td>
+                                            <td>{dc.customerId?.companyName || dc.customerId?._id || "N/A"}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination same as Employees */}
+                        {!loading && !error && entities.length > 0 && (
+                            <div className="pagination-container">
+                                <div className="pagination-info">
+                                    <span>Show</span>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setPageSize(Number(e.target.value));
+                                            setPage(1);
+                                        }}
+                                        className="page-size-select"
+                                    >
+                                        {[3, 5, 10, 20].map((n) => (
+                                            <option key={n} value={n}>
+                                                {n}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span>Row</span>
+                                </div>
+                                <div className="pagination">
+                                    <button
+                                        onClick={() => setPage(Math.max(1, page - 1))}
+                                        disabled={page === 1}
+                                        className="page-btn"
+                                    >
+                                        {"<"}
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .slice(0, 5)
+                                        .map((n) => (
+                                            <button
+                                                key={n}
+                                                onClick={() => setPage(n)}
+                                                className={`page-btn ${n === page ? "active" : ""}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    {totalPages > 5 && (
+                                        <>
+                                            <span className="page-dots">...</span>
+                                            <button
+                                                onClick={() => setPage(totalPages)}
+                                                className="page-btn"
+                                            >
+                                                {totalPages}
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                        disabled={page === totalPages}
+                                        className="page-btn"
+                                    >
+                                        {">"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+
+                {currentView === "Product" && (
+                    <div className="table-container">
+                        <div className="table-wrapper">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Stock</th>
+                                        <th>Price</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading && (
+                                        <tr>
+                                            <td colSpan={5} className="loading">Loading...</td>
+                                        </tr>
+                                    )}
+                                    {error && !loading && (
+                                        <tr>
+                                            <td colSpan={5} className="error">{error}</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={5} className="empty">No products found.</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.map((prod) => (
+                                        <tr
+                                            key={prod._id}
+                                            onClick={() => {
+                                                setSelected(prod);
+                                                setModalType("details");
+                                            }}
+                                            className="table-row"
+                                        >
+                                            <td>{prod.name}</td>
+                                            <td>{prod.description || "—"}</td>
+                                            <td>{prod.type}</td>
+                                            <td>{typeof prod.stock === "number" ? prod.stock : "N/A"}</td>
+                                            <td>{prod.price ? `$${prod.price}` : "N/A"}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination same as other tables */}
+                        {!loading && !error && entities.length > 0 && (
+                            <div className="pagination-container">
+                                <div className="pagination-info">
+                                    <span>Show</span>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setPageSize(Number(e.target.value));
+                                            setPage(1);
+                                        }}
+                                        className="page-size-select"
+                                    >
+                                        {[3, 5, 10, 20].map((n) => (
+                                            <option key={n} value={n}>
+                                                {n}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span>Row</span>
+                                </div>
+                                <div className="pagination">
+                                    <button
+                                        onClick={() => setPage(Math.max(1, page - 1))}
+                                        disabled={page === 1}
+                                        className="page-btn"
+                                    >
+                                        {"<"}
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .slice(0, 5)
+                                        .map((n) => (
+                                            <button
+                                                key={n}
+                                                onClick={() => setPage(n)}
+                                                className={`page-btn ${n === page ? "active" : ""}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    {totalPages > 5 && (
+                                        <>
+                                            <span className="page-dots">...</span>
+                                            <button
+                                                onClick={() => setPage(totalPages)}
+                                                className="page-btn"
+                                            >
+                                                {totalPages}
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                        disabled={page === totalPages}
+                                        className="page-btn"
+                                    >
+                                        {">"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+
+                {currentView === "Service" && (
+                    <div className="table-container">
+                        <div className="table-wrapper">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Type</th>
+                                        <th>Datacenter Location</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading && (
+                                        <tr>
+                                            <td colSpan={4} className="loading">Loading...</td>
+                                        </tr>
+                                    )}
+                                    {error && !loading && (
+                                        <tr>
+                                            <td colSpan={4} className="error">{error}</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={4} className="empty">No services found.</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.map((srv) => (
+                                        <tr
+                                            key={srv._id}
+                                            onClick={() => {
+                                                setSelected(srv);
+                                                setModalType("details");
+                                            }}
+                                            className="table-row"
+                                        >
+                                            <td>{srv.name}</td>
+                                            <td>{srv.description || "N/A"}</td>
+                                            <td>{srv.type}</td>
+                                            <td>{srv.hostingDetails?.datacenterLocation || "N/A"}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination same as others */}
+                        {!loading && !error && entities.length > 0 && (
+                            <div className="pagination-container">
+                                <div className="pagination-info">
+                                    <span>Show</span>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setPageSize(Number(e.target.value));
+                                            setPage(1);
+                                        }}
+                                        className="page-size-select"
+                                    >
+                                        {[3, 5, 10, 20].map((n) => (
+                                            <option key={n} value={n}>
+                                                {n}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span>Row</span>
+                                </div>
+                                <div className="pagination">
+                                    <button
+                                        onClick={() => setPage(Math.max(1, page - 1))}
+                                        disabled={page === 1}
+                                        className="page-btn"
+                                    >
+                                        {"<"}
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .slice(0, 5)
+                                        .map((n) => (
+                                            <button
+                                                key={n}
+                                                onClick={() => setPage(n)}
+                                                className={`page-btn ${n === page ? "active" : ""}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    {totalPages > 5 && (
+                                        <>
+                                            <span className="page-dots">...</span>
+                                            <button
+                                                onClick={() => setPage(totalPages)}
+                                                className="page-btn"
+                                            >
+                                                {totalPages}
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                        disabled={page === totalPages}
+                                        className="page-btn"
+                                    >
+                                        {">"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
             </div>
 
-            {/* --- Modal Rendering --- */}
+            {/* Modal Rendering */}
             <Modal
-                open={!!selected}
-                onClose={() => setSelected(null)}
-                title={selected ? selected.companyName : ''}
+                open={!!modalType}
+                onClose={() => {
+                    setSelected(null);
+                    setModalType(null);
+                    setEmployeeErrors({});
+                    setNewProduct(initialProduct);
+                    setSpecText("");
+                    setProductErrors({});
+                    setNewDC({ location: "", assetType: "", assetId: "", customerId: "" });
+                    setDcErrors({});
+                }}
+                title={
+                    modalType === "details"
+                        ? selected?.companyName || selected?.name || "Details"
+                        : modalType === "employee"
+                            ? "Add Employee"
+                            : modalType === "product"
+                                ? "Add Product"
+                                : modalType === "dc"
+                                    ? "Add Datacenter"
+                                    : modalType === "service"
+                                        ? "Add Service"
+                                        : ""
+                }
             >
-                {selected && (
+                {/* DETAILS MODAL */}
+                {modalType === "details" && selected && (
                     <div className="modal-content">
                         {selected.contactPerson && (
                             <div className="info-row">
@@ -287,14 +1077,10 @@ export default function Adminview() {
                         )}
                         {selected.address && (
                             <div className="info-row">
-                                <b>Address:</b>{' '}
-                                {[
-                                    selected.address.street,
-                                    selected.address.city,
-                                    selected.address.country,
-                                ]
+                                <b>Address:</b>{" "}
+                                {[selected.address.street, selected.address.city, selected.address.country]
                                     .filter(Boolean)
-                                    .join(', ')}
+                                    .join(", ")}
                             </div>
                         )}
 
@@ -321,7 +1107,466 @@ export default function Adminview() {
                         )}
                     </div>
                 )}
+
+                {/* EMPLOYEE ADD MODAL (example) */}
+                {modalType === "employee" && (
+                    <div className="modal-content">
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Name"
+                                value={newEmployee.name}
+                                onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
+                            />
+                            {employeeErrors.name && <p className="error-text">{employeeErrors.name}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <input
+                                type="email"
+                                placeholder="Email"
+                                value={newEmployee.email}
+                                onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
+                            />
+                            {employeeErrors.email && <p className="error-text">{employeeErrors.email}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <input
+                                type="password"
+                                placeholder="Password"
+                                value={newEmployee.password}
+                                onChange={(e) => setNewEmployee({ ...newEmployee, password: e.target.value })}
+                            />
+                            {employeeErrors.password && <p className="error-text">{employeeErrors.password}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <select
+                                value={newEmployee.role}
+                                onChange={(e) => setNewEmployee({ ...newEmployee, role: e.target.value })}
+                            >
+                                <option value="" disabled>
+                                    Choose a role
+                                </option>
+                                <option value="admin">Admin</option>
+                                <option value="presales">Presales</option>
+                                <option value="support">Support</option>
+                                <option value="it">IT</option>
+                            </select>
+                            {employeeErrors.role && <p className="error-text">{employeeErrors.role}</p>}
+                        </div>
+
+                        {employeeErrors.general && <p className="error-text">{employeeErrors.general}</p>}
+
+                        <button onClick={handleSaveEmployee}>Save</button>
+                    </div>
+                )}
+                {/* PRODUCT ADD MODAL */}
+                {modalType === "product" && (
+                    <div className="modal-content">
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Name *"
+                                value={newProduct.name}
+                                onChange={(e) => setNewProduct({ ...newProduct, name: e.target.value })}
+                            />
+                            {productErrors.name && <p className="error-text">{productErrors.name}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <textarea
+                                placeholder="Description"
+                                value={newProduct.description}
+                                onChange={(e) => setNewProduct({ ...newProduct, description: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-field">
+                            <select
+                                value={newProduct.type}
+                                onChange={(e) => setNewProduct({ ...newProduct, type: e.target.value })}
+                            >
+                                <option value="" disabled>Choose a type</option>
+                                {["ai_model", "server", "storage", "network", "gpu", "cpu", "memory", "other"].map((t) => (
+                                    <option key={t} value={t}>{t}</option>
+                                ))}
+                            </select>
+                            {productErrors.type && <p className="error-text">{productErrors.type}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Vendor"
+                                value={newProduct.vendor}
+                                onChange={(e) => setNewProduct({ ...newProduct, vendor: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-field">
+                            <textarea
+                                placeholder='Specifications (JSON), e.g. {"gpu":"A100"}'
+                                value={specText}
+                                onChange={(e) => setSpecText(e.target.value)}
+                            />
+                            {productErrors.specifications && <p className="error-text">{productErrors.specifications}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <input
+                                type="number"
+                                placeholder="Stock *"
+                                value={newProduct.stock}
+                                onChange={(e) => setNewProduct({ ...newProduct, stock: e.target.value })}
+                            />
+                            {productErrors.stock && <p className="error-text">{productErrors.stock}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <input
+                                type="number"
+                                placeholder="Price *"
+                                value={newProduct.price}
+                                onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })}
+                            />
+                            {productErrors.price && <p className="error-text">{productErrors.price}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Serial Number"
+                                value={newProduct.serialNumber}
+                                onChange={(e) => setNewProduct({ ...newProduct, serialNumber: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Model"
+                                value={newProduct.model}
+                                onChange={(e) => setNewProduct({ ...newProduct, model: e.target.value })}
+                            />
+                        </div>
+
+                        {/* Location */}
+                        <div className="form-row">
+                            <div className="form-field">
+                                <input
+                                    type="text"
+                                    placeholder="Datacenter"
+                                    value={newProduct.location.datacenter}
+                                    onChange={(e) =>
+                                        setNewProduct({ ...newProduct, location: { ...newProduct.location, datacenter: e.target.value } })
+                                    }
+                                />
+                            </div>
+                            <div className="form-field">
+                                <input
+                                    type="text"
+                                    placeholder="Rack"
+                                    value={newProduct.location.rack}
+                                    onChange={(e) =>
+                                        setNewProduct({ ...newProduct, location: { ...newProduct.location, rack: e.target.value } })
+                                    }
+                                />
+                            </div>
+                            <div className="form-field">
+                                <input
+                                    type="text"
+                                    placeholder="Position"
+                                    value={newProduct.location.position}
+                                    onChange={(e) =>
+                                        setNewProduct({ ...newProduct, location: { ...newProduct.location, position: e.target.value } })
+                                    }
+                                />
+                            </div>
+                        </div>
+
+                        <div className="form-field">
+                            <select
+                                value={newProduct.status}
+                                onChange={(e) => setNewProduct({ ...newProduct, status: e.target.value })}
+                            >
+                                {["available", "allocated", "maintenance", "retired", "faulty"].map((s) => (
+                                    <option key={s} value={s}>{s}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* Dates */}
+                        {["purchaseDate", "warrantyExpiry", "lastMaintenance", "nextMaintenance"].map((field) => (
+                            <div className="form-field" key={field}>
+                                <label>{field}</label>
+                                <input
+                                    type="date"
+                                    value={newProduct[field] ? newProduct[field] : ""}
+                                    onChange={(e) => setNewProduct({ ...newProduct, [field]: e.target.value })}
+                                />
+                            </div>
+                        ))}
+
+                        <div className="form-field">
+                            <textarea
+                                placeholder="Notes"
+                                value={newProduct.notes}
+                                onChange={(e) => setNewProduct({ ...newProduct, notes: e.target.value })}
+                            />
+                        </div>
+
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Tags (comma separated)"
+                                value={newProduct.tags.join(", ")}
+                                onChange={(e) =>
+                                    setNewProduct({ ...newProduct, tags: e.target.value.split(",").map(t => t.trim()).filter(Boolean) })
+                                }
+                            />
+                        </div>
+
+                        {productErrors.general && <p className="error-text">{productErrors.general}</p>}
+
+                        <button onClick={handleSaveProduct}>Save</button>
+                    </div>
+                )}
+                {modalType === "dc" && (
+                    <div className="modal-content">
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Location"
+                                value={newDC.location}
+                                onChange={(e) => setNewDC({ ...newDC, location: e.target.value })}
+                            />
+                            {dcErrors.location && <p className="error-text">{dcErrors.location}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <select
+                                value={newDC.assetType}
+                                onChange={(e) => setNewDC({ ...newDC, assetType: e.target.value })}
+                            >
+                                <option value="" disabled>Choose asset type</option>
+                                <option value="server">Server</option>
+                                <option value="storage">Storage</option>
+                            </select>
+                            {dcErrors.assetType && <p className="error-text">{dcErrors.assetType}</p>}
+                        </div>
+
+                        <div className="form-field">
+                            <select
+                                value={newDC.assetId}
+                                onChange={(e) => setNewDC({ ...newDC, assetId: e.target.value })}
+                            >
+                                <option value="">Select Asset (Product)</option>
+                                {products.map((p) => (
+                                    <option key={p._id} value={p._id}>{p.name}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-field">
+                            <select
+                                value={newDC.customerId}
+                                onChange={(e) => setNewDC({ ...newDC, customerId: e.target.value })}
+                            >
+                                <option value="">Select Customer</option>
+                                {customers.map((c) => (
+                                    <option key={c._id} value={c._id}>{c.companyName}</option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {dcErrors.general && <p className="error-text">{dcErrors.general}</p>}
+                        <button onClick={handleSaveDC}>Save</button>
+                    </div>
+                )}
+                {/* SERVICE ADD MODAL */}
+                {modalType === "service" && (
+                    <div className="modal-content">
+                        {/* Service Name */}
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Service Name"
+                                value={newService.name || ""}
+                                onChange={(e) => setNewService({ ...newService, name: e.target.value })}
+                            />
+                            {serviceErrors.name && <p className="error-text">{serviceErrors.name}</p>}
+                        </div>
+
+                        {/* Description */}
+                        <div className="form-field">
+                            <textarea
+                                placeholder="Description"
+                                value={newService.description || ""}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, description: e.target.value })
+                                }
+                            />
+                        </div>
+
+                        {/* Type */}
+                        <div className="form-field">
+                            <select
+                                value={newService.type || ""}
+                                onChange={(e) => setNewService({ ...newService, type: e.target.value })}
+                            >
+                                <option value="" disabled>
+                                    Choose a type
+                                </option>
+                                <option value="ai_only">AI Only</option>
+                                <option value="ai_hosted">AI Hosted</option>
+                                <option value="infrastructure">Infrastructure</option>
+                            </select>
+                            {serviceErrors.type && <p className="error-text">{serviceErrors.type}</p>}
+                        </div>
+
+                        {/* Customer (optional) */}
+                        <div className="form-field">
+                            <select
+                                value={newService.customerId || ""}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, customerId: e.target.value })
+                                }
+                            >
+                                <option value="">No customer</option>
+                                {customers.map((c) => (
+                                    <option key={c._id} value={c._id}>
+                                        {c.companyName}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        {/* IP Address (only if customer is chosen) */}
+                        {newService.customerId && (
+                            <div className="form-field">
+                                <input
+                                    type="text"
+                                    placeholder="IP Address"
+                                    value={newService.ipAddress || ""}
+                                    onChange={(e) =>
+                                        setNewService({ ...newService, ipAddress: e.target.value })
+                                    }
+                                />
+                                {serviceErrors.ipAddress && (
+                                    <p className="error-text">{serviceErrors.ipAddress}</p>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Associated Products */}
+                        <h4>Associated Products</h4>
+                        {(newService.associatedProducts || []).map((p, idx) => (
+                            <div className="form-field" key={idx} style={{ display: "flex", gap: "10px" }}>
+                                <select
+                                    value={p.productId || ""}
+                                    onChange={(e) => {
+                                        const updated = [...newService.associatedProducts];
+                                        updated[idx].productId = e.target.value;
+                                        setNewService({ ...newService, associatedProducts: updated });
+                                    }}
+                                >
+                                    <option value="">Choose a product</option>
+                                    {products.map((prod) => (
+                                        <option key={prod._id} value={prod._id}>
+                                            {prod.name}
+                                        </option>
+                                    ))}
+                                </select>
+                                <input
+                                    type="number"
+                                    min="1"
+                                    placeholder="Quantity"
+                                    value={p.quantity || ""}
+                                    onChange={(e) => {
+                                        const updated = [...newService.associatedProducts];
+                                        updated[idx].quantity = e.target.value;
+                                        setNewService({ ...newService, associatedProducts: updated });
+                                    }}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        const updated = [...newService.associatedProducts];
+                                        updated.splice(idx, 1);
+                                        setNewService({ ...newService, associatedProducts: updated });
+                                    }}
+                                >
+                                    ✕
+                                </button>
+                                {serviceErrors[`product-${idx}`] && (
+                                    <p className="error-text">{serviceErrors[`product-${idx}`]}</p>
+                                )}
+                                {serviceErrors[`quantity-${idx}`] && (
+                                    <p className="error-text">{serviceErrors[`quantity-${idx}`]}</p>
+                                )}
+                            </div>
+                        ))}
+                        <button
+                            type="button"
+                            onClick={() =>
+                                setNewService({
+                                    ...newService,
+                                    associatedProducts: [
+                                        ...(newService.associatedProducts || []),
+                                        { productId: "", quantity: 1 },
+                                    ],
+                                })
+                            }
+                        >
+                            + Add Product
+                        </button>
+
+                        {/* Datacenter Location */}
+                        <div className="form-field">
+                            <input
+                                type="text"
+                                placeholder="Datacenter Location"
+                                value={newService.datacenterLocation || ""}
+                                onChange={(e) =>
+                                    setNewService({ ...newService, datacenterLocation: e.target.value })
+                                }
+                            />
+                        </div>
+
+                        {/* VM Specs (JSON as string) */}
+                        <div className="form-field">
+                            <textarea
+                                placeholder="VM Specs (JSON format)"
+                                value={
+                                    newService.vmSpecs
+                                        ? JSON.stringify(newService.vmSpecs, null, 2)
+                                        : ""
+                                }
+                                onChange={(e) => {
+                                    try {
+                                        const parsed = JSON.parse(e.target.value);
+                                        setNewService({ ...newService, vmSpecs: parsed });
+                                    } catch {
+                                        setNewService({ ...newService, vmSpecs: {} });
+                                    }
+                                }}
+                            />
+                        </div>
+
+                        {/* Errors (general) */}
+                        {serviceErrors.general && (
+                            <p className="error-text">{serviceErrors.general}</p>
+                        )}
+
+                        <button onClick={handleSaveService}>Save</button>
+                    </div>
+                )}
+
+                {/* Later you’ll add Product/DC/Service add modals here */}
             </Modal>
+
         </div>
     );
 }
