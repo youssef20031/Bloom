@@ -29,6 +29,10 @@ const io = new Server(server, {
     origin: "*", // Change to frontend origin for security
   }
 });
+
+// Set the io instance for AlertService to use
+setIo(io);
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -36,7 +40,6 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/customers", customerRoutes);
 app.use("/api/support-ticket", supportTicketRoutes); // Use only /api/support-ticket for support tickets
-setIo(io);
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
   .then(() => console.log("Successfully connected to MongoDB"))
@@ -85,6 +88,34 @@ app.use((err, req, res, next) => {
 
 io.on("connection", (socket) => {
   console.log("🔌 Frontend connected to WebSocket");
+
+  // Handle test events
+  socket.on("testEvent", (data) => {
+    console.log("📦 Test event received:", data);
+    socket.emit("test-response", { message: "Test event received successfully" });
+  });
+
+  // Handle alert-related events
+  socket.on("mark-alert-read", async (data) => {
+    try {
+      console.log("📋 Marking alert as read:", data.alertId);
+      // Broadcast to all clients that alert was marked as read
+      io.emit("alert-update", { 
+        alertId: data.alertId, 
+        action: "marked_read",
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      console.error("Error marking alert as read:", error);
+    }
+  });
+
+  // Join IT dashboard room for targeted alerts
+  socket.on("join-it-dashboard", () => {
+    socket.join("it-dashboard");
+    console.log("👩‍💻 Client joined IT dashboard room, socket ID:", socket.id);
+    console.log("🏠 Current rooms for this socket:", Array.from(socket.rooms));
+  });
 
   socket.on("disconnect", () => {
     console.log("❌ Frontend disconnected from WebSocket");

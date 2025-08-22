@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './it.style.css';
-import { LayoutDashboard, AlertTriangle, Server, Wrench, Users, Bell, Plus, Search, Download, Calendar, Activity as ActivityIcon, Thermometer, Droplet, Zap, Cloud, Shield } from 'lucide-react';
+import { LayoutDashboard, AlertTriangle, Server, Wrench, Users, Bell, Plus, Search, Download, Calendar, Activity as ActivityIcon, Thermometer, Droplet, Zap, Cloud, Shield, Wifi, WifiOff, CheckCircle2, X, Eye, Clock, AlertCircle, Flame } from 'lucide-react';
+import socketService from '../../utils/socket.js';
 
 export default function ITDashboard() {
 	const [activeTab, setActiveTab] = useState('Incidents');
@@ -11,6 +12,9 @@ export default function ITDashboard() {
 	const [users, setUsers] = useState([]);
 	const [alerts, setAlerts] = useState([]);
 	const [healthOverview, setHealthOverview] = useState(null);
+	const [isConnected, setIsConnected] = useState(false);
+	const [realtimeAlerts, setRealtimeAlerts] = useState([]);
+	const alertSound = useRef(null);
 	// Prepare dynamic health metrics array
 	const healthMetrics = useMemo(() => {
 		if (!healthOverview) return [];
@@ -60,6 +64,82 @@ export default function ITDashboard() {
 			default: return 'badge-gray';
 		}
 	};
+	// WebSocket connection and real-time functionality
+	useEffect(() => {
+		// Connect to WebSocket
+		const socket = socketService.connect();
+		
+		// Set connection status
+		setIsConnected(socketService.getConnectionStatus());
+		
+		// Join IT dashboard room
+		socket.emit('join-it-dashboard');
+		
+		// Listen for connection status changes
+		socket.on('connect', () => {
+			setIsConnected(true);
+			console.log('✅ Connected to WebSocket server');
+		});
+		
+		socket.on('disconnect', () => {
+			setIsConnected(false);
+			console.log('❌ Disconnected from WebSocket server');
+		});
+		
+		// Listen for new alerts
+		socketService.onNewAlert((data) => {
+			console.log('🚨 New alert received in IT Dashboard:', data);
+			console.log('Alert data structure:', JSON.stringify(data, null, 2));
+			
+			setRealtimeAlerts(prev => {
+				const updated = [data.alert, ...prev.slice(0, 9)]; // Keep last 10 alerts
+				console.log('Updated realtime alerts:', updated.length);
+				return updated;
+			});
+			setAlerts(prev => [data.alert, ...prev]); // Add to main alerts list
+			
+			// Play alert sound (optional)
+			if (alertSound.current) {
+				alertSound.current.play().catch(e => console.log('Could not play alert sound'));
+			}
+		});
+		
+		// Listen for alert updates
+		socketService.onAlertUpdate((data) => {
+			console.log('📝 Alert updated:', data);
+			setAlerts(prev => prev.map(alert => 
+				alert._id === data.alert._id ? data.alert : alert
+			));
+			setRealtimeAlerts(prev => prev.map(alert => 
+				alert._id === data.alert._id ? data.alert : alert
+			));
+		});
+		
+		// Listen for alert resolutions
+		socketService.onAlertResolved((data) => {
+			console.log('✅ Alert resolved:', data);
+			setAlerts(prev => prev.map(alert => 
+				alert._id === data.alert._id ? data.alert : alert
+			));
+			setRealtimeAlerts(prev => prev.map(alert => 
+				alert._id === data.alert._id ? data.alert : alert
+			));
+		});
+		
+		// Test the connection
+		socketService.sendTestEvent({ 
+			message: "Hello from IT Dashboard",
+			timestamp: new Date().toISOString()
+		});
+		
+		// Cleanup function
+		return () => {
+			socketService.removeAllListeners();
+			socketService.disconnect();
+		};
+	}, []);
+
+	// Fetch initial data
 	useEffect(() => {
 		fetch('/api/support-ticket')
 			.then(res => res.json())
@@ -97,6 +177,7 @@ export default function ITDashboard() {
 	const filteredIncidents = useMemo(() => {
 		const term = searchTerm.toLowerCase();
 		return incidents.filter(i =>
+			i._id.toLowerCase().includes(term) ||
 			i.issue.toLowerCase().includes(term) ||
 			(i.supportAgentId?.name || '').toLowerCase().includes(term)
 		);
@@ -158,8 +239,9 @@ export default function ITDashboard() {
 	const exportCSV = () => {
 		let headers = [], rows = [];
 		if (activeTab === 'Incidents') {
-			headers = ['Issue','Priority','Status','Assignee','Updated'];
+			headers = ['Ticket ID','Issue','Priority','Status','Assignee','Updated'];
 			rows = filteredIncidents.map(r => [
+				r._id,
 				r.issue,
 				r.priority,
 				r.status,
@@ -209,6 +291,81 @@ export default function ITDashboard() {
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
+	};
+
+	// Helper functions for alerts
+	const createTestAlert = async () => {
+		try {
+			console.log('🧪 Creating test alert...');
+			const response = await fetch('/api/alerts/test', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			});
+			if (response.ok) {
+				const result = await response.json();
+				console.log('✅ Test alert created successfully:', result);
+			} else {
+				console.error('❌ Failed to create test alert:', response.status, response.statusText);
+			}
+		} catch (error) {
+			console.error('❌ Error creating test alert:', error);
+		}
+	};
+
+	const createRandomTestAlert = async () => {
+		try {
+			console.log('🎲 Creating random test alert...');
+			const response = await fetch('/api/alerts/test/random', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			});
+			if (response.ok) {
+				const result = await response.json();
+				console.log('✅ Random test alert created successfully:', result);
+			} else {
+				console.error('❌ Failed to create random test alert:', response.status, response.statusText);
+			}
+		} catch (error) {
+			console.error('❌ Error creating random test alert:', error);
+		}
+	};
+
+	const markAlertAsRead = async (alertId) => {
+		try {
+			const response = await fetch(`/api/alerts/${alertId}/read`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			});
+			if (response.ok) {
+				console.log('✅ Alert marked as read');
+				// Also emit via WebSocket
+				socketService.markAlertAsRead(alertId);
+			}
+		} catch (error) {
+			console.error('❌ Error marking alert as read:', error);
+		}
+	};
+
+	const resolveAlert = async (alertId) => {
+		try {
+			const response = await fetch(`/api/alerts/${alertId}/resolve`, {
+				method: 'PATCH',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+			});
+			if (response.ok) {
+				console.log('✅ Alert resolved');
+			}
+		} catch (error) {
+			console.error('❌ Error resolving alert:', error);
+		}
 	};
 	return (
 		<div className="flex h-screen">
@@ -261,9 +418,53 @@ export default function ITDashboard() {
 									onChange={e => setSearchTerm(e.target.value)}
 								/>
 							</div>
-							<button className="btn-quiet" onClick={exportCSV}><Download className="w-4 h-4 mr-2" /> Export CSV</button>
+							
+							{/* WebSocket Connection Status */}
+							<div className="flex items-center space-x-2">
+								{isConnected ? (
+									<div className="flex items-center text-green-600 text-sm">
+										<Wifi className="w-4 h-4 mr-1" />
+										<span className="hidden md:inline">Live</span>
+									</div>
+								) : (
+									<div className="flex items-center text-red-600 text-sm">
+										<WifiOff className="w-4 h-4 mr-1" />
+										<span className="hidden md:inline">Offline</span>
+									</div>
+								)}
+							</div>
+
+							{/* Test Alert Buttons */}
+							<button 
+								className="btn-quiet text-sm"
+								onClick={createTestAlert}
+								title="Create Test Alert"
+							>
+								<AlertTriangle className="w-4 h-4 mr-1" />
+								Test Alert
+							</button>
+							
+							<button 
+								className="btn-quiet text-sm"
+								onClick={createRandomTestAlert}
+								title="Create Random Test Alert"
+							>
+								<ActivityIcon className="w-4 h-4 mr-1" />
+								Random Alert
+							</button>
+							
 							<button className="btn-primary"><Plus className="w-4 h-4 mr-2" /> New Incident</button>
-							<Bell className="text-gray-500 hidden sm:block" />
+							
+							{/* Notification Bell with Alert Count */}
+							<div className="relative notification-bell">
+								<Bell className="w-6 h-6 text-gray-500 cursor-pointer hover:text-gray-700 transition-colors duration-200" />
+								{realtimeAlerts.length > 0 && (
+									<span className="notification-count absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold shadow-lg">
+										{realtimeAlerts.length > 9 ? '9+' : realtimeAlerts.length}
+									</span>
+								)}
+							</div>
+							
 							<img src="https://i.pravatar.cc/40?img=12" alt="User Avatar" className="w-10 h-10 rounded-full" />
 						</div>
 					</div>
@@ -302,6 +503,7 @@ export default function ITDashboard() {
 								<thead>
 									{activeTab === 'Incidents' && (
 										<tr>
+											<th>Ticket ID</th>
 											<th>Issue</th>
 											<th>Priority</th>
 											<th>Status</th>
@@ -347,9 +549,10 @@ export default function ITDashboard() {
 								<tbody>
 									{activeTab === 'Incidents' && paginatedData.map((row) => (
 										<tr key={row._id}>
+											<td>{row._id}</td>
 											<td>{row.issue}</td>
-											<td><span className={priorityToClass(row.priority)}>{row.priority}</span></td>
-											<td><span className={statusToClass(row.status)}>{row.status}</span></td>
+											<td><span className={`badge ${priorityToClass(row.priority)}`}>{row.priority}</span></td>
+											<td><span className={`badge ${statusToClass(row.status)}`}>{row.status}</span></td>
 											<td>{row.supportAgentId?.name || 'Unassigned'}</td>
 											<td>{row.history?.length ? new Date(row.history[row.history.length - 1].timestamp).toLocaleString() : new Date(row.createdAt).toLocaleString()}</td>
 										</tr>
@@ -424,8 +627,153 @@ export default function ITDashboard() {
 						</div>
 					</div>
 
-					{/* Right column: Health & Activity */}
+					{/* Right column: Real-time Alerts, Health & Activity */}
 					<div className="space-y-6">
+						{/* Real-time Alerts */}
+						<div className="stat-card">
+							<div className="flex items-center justify-between mb-4">
+								<h3 className="font-semibold text-gray-800 flex items-center">
+								<Bell className="w-4 h-4 mr-2" />
+								Live Alerts
+								<span className={`ml-2 w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
+							</h3>
+								{realtimeAlerts.length > 0 && (
+									<div className="flex items-center space-x-2 text-xs">
+										<span className="status-indicator status-new">
+											{realtimeAlerts.filter(a => a.severity === 'critical' && a.status !== 'resolved').length} Critical
+										</span>
+										<span className="status-indicator status-acknowledged">
+											{realtimeAlerts.filter(a => a.severity === 'warning' && a.status !== 'resolved').length} Warning
+										</span>
+									</div>
+								)}
+							</div>
+							{realtimeAlerts.length === 0 ? (
+										<div className="flex flex-col items-center justify-center py-8 text-center">
+											<div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mb-3">
+												<Bell className="w-6 h-6 text-gray-400" />
+											</div>
+											<p className="text-gray-500 text-sm font-medium">All clear!</p>
+											<p className="text-gray-400 text-xs mt-1">No active alerts at the moment</p>
+										</div>
+									) : (
+										<div className="space-y-3 max-h-96 overflow-y-auto alert-scroll">
+											{realtimeAlerts.slice(0, 10).map((alert) => {
+												const getAlertStyle = () => {
+													if (alert.status === 'resolved') {
+														return {
+															border: 'border-l-4 border-green-400',
+															bg: 'bg-green-50',
+															text: 'text-green-800',
+															subtext: 'text-green-600',
+															icon: CheckCircle2
+														};
+													}
+													if (alert.severity === 'critical') {
+														return {
+															border: 'border-l-4 border-red-500',
+															bg: 'bg-red-50 ring-1 ring-red-200',
+															text: 'text-red-900',
+															subtext: 'text-red-700',
+															icon: AlertTriangle
+														};
+													}
+													return {
+														border: 'border-l-4 border-amber-400',
+														bg: 'bg-amber-50 ring-1 ring-amber-200',
+														text: 'text-amber-900',
+														subtext: 'text-amber-700',
+														icon: AlertCircle
+													};
+												};
+
+												const getTypeIcon = () => {
+													switch (alert.type) {
+														case 'temperature': return Thermometer;
+														case 'humidity': return Droplet;
+														case 'power': return Zap;
+														case 'security': return Shield;
+														case 'smoke': return Flame;
+														default: return AlertTriangle;
+													}
+												};
+
+												const style = getAlertStyle();
+												const StatusIcon = style.icon;
+												const TypeIcon = getTypeIcon();
+
+																				return (
+									<div 
+										key={alert._id} 
+										className={`${style.border} ${style.bg} rounded-lg p-4 alert-item transition-all duration-200 hover:shadow-md ${
+											alert.status === 'resolved' ? 'severity-resolved' : 
+											alert.severity === 'critical' ? 'severity-critical' : 'severity-warning'
+										} ${!alert.read ? 'unread' : ''}`}
+									>
+														<div className="flex items-start space-x-3">
+															<div className="flex-shrink-0">
+																<div className={`w-10 h-10 rounded-full flex items-center justify-center ${alert.severity === 'critical' ? 'bg-red-100' : 'bg-amber-100'}`}>
+																	<TypeIcon className={`w-5 h-5 ${alert.severity === 'critical' ? 'text-red-600' : 'text-amber-600'}`} />
+																</div>
+															</div>
+															<div className="flex-1 min-w-0">
+																<div className="flex items-center justify-between">
+																	<div className="flex items-center space-x-2">
+																		<h4 className={`text-sm font-semibold ${style.text} truncate`}>
+																			{alert.type?.charAt(0).toUpperCase() + alert.type?.slice(1)}
+																		</h4>
+																		<span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+																			alert.severity === 'critical' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'
+																		}`}>
+																			{alert.severity}
+																		</span>
+																	</div>
+																	{alert.status === 'resolved' && (
+																		<StatusIcon className="w-5 h-5 text-green-600" />
+																	)}
+																</div>
+																<p className={`text-sm ${style.subtext} mt-1 leading-relaxed`}>
+																	{alert.message}
+																</p>
+																<div className="flex items-center justify-between mt-3">
+																	<div className="flex items-center text-xs text-gray-500">
+																		<Clock className="w-3 h-3 mr-1" />
+																		{new Date(alert.timestamp).toLocaleTimeString([], { 
+																			hour: '2-digit', 
+																			minute: '2-digit',
+																			hour12: true
+																		})}
+												</div>
+																	{alert.status !== 'resolved' && (
+																		<div className="flex items-center space-x-2">
+													{!alert.read && (
+														<button 
+															onClick={() => markAlertAsRead(alert._id)}
+																					className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+															title="Mark as read"
+														>
+																					<Eye className="w-4 h-4" />
+														</button>
+													)}
+														<button 
+															onClick={() => resolveAlert(alert._id)}
+																				className="inline-flex items-center justify-center w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+																				title="Resolve alert"
+														>
+																				<CheckCircle2 className="w-4 h-4" />
+														</button>
+																		</div>
+													)}
+												</div>
+											</div>
+														</div>
+													</div>
+												);
+											})}
+										</div>
+							)}
+						</div>
+
 						<div className="stat-card">
 							<h3 className="font-semibold text-gray-800 mb-4">System Health</h3>
 							<ul className="space-y-3">
