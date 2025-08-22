@@ -131,12 +131,35 @@ export default function ITDashboard() {
 			u.role.toLowerCase().includes(term)
 		);
 	}, [users, searchTerm]);
+	// Pagination state
+	const [rowsPerPage, setRowsPerPage] = useState(5);
+	const [currentPage, setCurrentPage] = useState(1);
+	// Reset to first page when tab or rowsPerPage changes
+	useEffect(() => setCurrentPage(1), [activeTab, rowsPerPage]);
+	// Compute filtered data per tab
+	const currentData = useMemo(() => {
+		switch (activeTab) {
+			case 'Incidents': return filteredIncidents;
+			case 'Assets': return filteredAssets;
+			case 'Servers': return filteredServers;
+			case 'Changes': return filteredChanges;
+			case 'Users': return filteredUsers;
+			default: return [];
+		}
+	}, [activeTab, filteredIncidents, filteredAssets, filteredServers, filteredChanges, filteredUsers]);
+	const totalRows = currentData.length;
+	const maxPage = Math.ceil(totalRows / rowsPerPage) || 1;
+	// Paginate rows for display
+	const paginatedData = useMemo(() => {
+		const start = (currentPage - 1) * rowsPerPage;
+		return currentData.slice(start, start + rowsPerPage);
+	}, [currentData, currentPage, rowsPerPage]);
 	// Export current table data as CSV
 	const exportCSV = () => {
 		let headers = [], rows = [];
 		if (activeTab === 'Incidents') {
 			headers = ['Issue','Priority','Status','Assignee','Updated'];
-			rows = incidents.map(r => [
+			rows = filteredIncidents.map(r => [
 				r.issue,
 				r.priority,
 				r.status,
@@ -144,11 +167,15 @@ export default function ITDashboard() {
 				new Date(r.history?.length ? r.history[r.history.length-1].timestamp : r.createdAt).toLocaleString()
 			]);
 		} else if (activeTab === 'Assets') {
-			headers = ['Asset ID','Type','Owner','Status','Location'];
-			rows = assets.map(a => [a.id, a.type, a.owner, a.status, a.location]);
+			headers = ['Asset ID','Type','Location'];
+			rows = filteredAssets.map(a => [
+				a.assetId?.name || '',
+				a.assetType,
+				a.location
+			]);
 		} else if (activeTab === 'Servers') {
 			headers = ['Server Name','Location','Temperature','PowerDraw','Last Reading'];
-			rows = servers.map(s => {
+			rows = filteredServers.map(s => {
 				const lr = s.latestReading || {};
 				return [
 					s.assetId?.name || '',
@@ -160,11 +187,19 @@ export default function ITDashboard() {
 			});
 		} else if (activeTab === 'Changes') {
 			headers = ['Service Name','Type','Created','Updated'];
-			rows = changes.map(c => [
+			rows = filteredChanges.map(c => [
 				c.name,
 				c.type,
 				new Date(c.createdAt).toLocaleString(),
 				new Date(c.updatedAt).toLocaleString()
+			]);
+		} else if (activeTab === 'Users') {
+			headers = ['Name','Email','Role','Created'];
+			rows = filteredUsers.map(u => [
+				u.name,
+				u.email,
+				u.role,
+				new Date(u.createdAt).toLocaleString()
 			]);
 		}
 		const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -182,7 +217,6 @@ export default function ITDashboard() {
 				<div className="p-6 text-2xl font-bold">BLOOM</div>
 				<nav className="mt-8 space-y-2">
 					{[
-						{ icon: LayoutDashboard, label: 'Dashboard', id: 'Dashboard' },
 						{ icon: AlertTriangle, label: 'Incidents', id: 'Incidents' },
 						{ icon: Server, label: 'Assets', id: 'Assets' },
 						{ icon: Wrench, label: 'Changes', id: 'Changes' },
@@ -311,7 +345,7 @@ export default function ITDashboard() {
 									)}
 								</thead>
 								<tbody>
-									{activeTab === 'Incidents' && filteredIncidents.map((row) => (
+									{activeTab === 'Incidents' && paginatedData.map((row) => (
 										<tr key={row._id}>
 											<td>{row.issue}</td>
 											<td><span className={priorityToClass(row.priority)}>{row.priority}</span></td>
@@ -320,7 +354,7 @@ export default function ITDashboard() {
 											<td>{row.history?.length ? new Date(row.history[row.history.length - 1].timestamp).toLocaleString() : new Date(row.createdAt).toLocaleString()}</td>
 										</tr>
 									))}
-									{activeTab === 'Assets' && filteredAssets.map((a) => (
+									{activeTab === 'Assets' && paginatedData.map((a) => (
 										<tr key={a.id}>
 											<td>{a.id}</td>
 											<td>{a.type}</td>
@@ -329,7 +363,7 @@ export default function ITDashboard() {
 											<td>{a.location}</td>
 										</tr>
 									))}
-									{activeTab === 'Servers' && filteredServers.map((s) => {
+									{activeTab === 'Servers' && paginatedData.map((s) => {
 										const { assetId, location, latestReading } = s;
 										return (
 										<tr key={s._id}>
@@ -341,7 +375,7 @@ export default function ITDashboard() {
 										</tr>
 										);
 									})}
-									{activeTab === 'Changes' && filteredChanges.map((c) => (
+									{activeTab === 'Changes' && paginatedData.map((c) => (
 										<tr key={c._id}>
 											<td>{c.name}</td>
 											<td>{c.type}</td>
@@ -349,7 +383,7 @@ export default function ITDashboard() {
 											<td>{new Date(c.updatedAt).toLocaleString()}</td>
 										</tr>
 									))}
-									{activeTab === 'Users' && filteredUsers.map((u) => (
+									{activeTab === 'Users' && paginatedData.map((u) => (
 										<tr key={u._id}>
 											<td>{u.name}</td>
 											<td>{u.email}</td>
@@ -363,18 +397,29 @@ export default function ITDashboard() {
 						<div className="mt-4 flex items-center justify-between text-sm text-gray-600">
 							<div className="flex items-center space-x-2">
 								<span>Show</span>
-								<select className="it-select">
-									<option>5</option>
-									<option>10</option>
-									<option>20</option>
+								<select
+									className="it-select"
+									value={rowsPerPage}
+									onChange={e => setRowsPerPage(Number(e.target.value))}
+								>
+									{[5,10,20].map(n => <option key={n} value={n}>{n}</option>)}
 								</select>
 								<span>rows</span>
 							</div>
 							<div className="space-x-2">
-								<button className="btn-quiet">Prev</button>
-								<button className="btn-primary btn-small">1</button>
-								<button className="btn-quiet">2</button>
-								<button className="btn-quiet">Next</button>
+								<button
+									className="btn-quiet"
+									disabled={currentPage <= 1}
+									onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+								>Prev</button>
+								<button className="btn-primary btn-small" disabled>
+									{currentPage} / {maxPage}
+								</button>
+								<button
+									className="btn-quiet"
+									disabled={currentPage >= maxPage}
+									onClick={() => setCurrentPage(p => Math.min(p + 1, maxPage))}
+								>Next</button>
 							</div>
 						</div>
 					</div>
