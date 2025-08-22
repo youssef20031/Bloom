@@ -1,6 +1,36 @@
 import Datacenter from '../models/datacenter.js';
 import Alert from '../models/alerts.js';
+import Customer from '../models/customer.js';
 import { getIo } from '../socket.js';
+
+// Helper to compute health overview from assets array
+async function computeHealthData(assets) {
+  const totalAssets = assets.length;
+  const assetsByType = assets.reduce((acc, a) => { acc[a.assetType] = (acc[a.assetType]||0)+1; return acc; }, {});
+  let tempSum=0,tempCount=0,humiditySum=0,humidityCount=0,powerSum=0,powerCount=0;
+  assets.forEach(a=>{
+    const latest = a.iotReadings[a.iotReadings.length-1];
+    if(!latest) return;
+    if(typeof latest.temperature==='number'){tempSum+=latest.temperature;tempCount++;}
+    if(typeof latest.humidity==='number'){humiditySum+=latest.humidity;humidityCount++;}
+    if(typeof latest.powerDraw==='number'){powerSum+=latest.powerDraw;powerCount++;}
+  });
+  const assetIds=assets.map(a=>a._id);
+  const activeAlerts = await Alert.find({datacenterId:{$in:assetIds},status:{$ne:'resolved'}});
+  const alertsBySeverity = activeAlerts.reduce((acc,a)=>{acc[a.severity]=(acc[a.severity]||0)+1;return acc;},{});
+  const alertsByType = activeAlerts.reduce((acc,a)=>{acc[a.type]=(acc[a.type]||0)+1;return acc;},{});
+  return {
+    totalAssets,
+    assetsByType,
+    averages:{
+      temperature: tempCount?+(tempSum/tempCount).toFixed(2):null,
+      humidity: humidityCount?+(humiditySum/humidityCount).toFixed(2):null,
+      powerDraw: powerCount?+(powerSum/powerCount).toFixed(2):null
+    },
+    alerts:{ totalActive: activeAlerts.length, bySeverity:alertsBySeverity, byType:alertsByType }
+  };
+}
+
 // Create a new datacenter asset
 export const createDatacenterAsset = async (req, res) => {
   try {
@@ -108,53 +138,25 @@ export const getDataCenterById = async (req, res) => {
   }
 };
 
-// High-level health reports (backend-only, no new controllers)
+// New API: health overview filtered by customerId via route param
+export const getHealthOverviewByCustomer = async (req, res) => {
+  try {
+    const userId = req.params.customerId;
+    const customer = await Customer.findOne({ userId });
+    if (!customer) return res.status(404).json({ message: 'Customer not found' });
+    const assets = await Datacenter.find({ customerId: customer._id });
+    const data = await computeHealthData(assets);
+    res.json(data);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 export const getHealthOverview = async (req, res) => {
   try {
     const assets = await Datacenter.find({});
-
-    const totalAssets = assets.length;
-    const assetsByType = assets.reduce((acc, a) => {
-      acc[a.assetType] = (acc[a.assetType] || 0) + 1;
-      return acc;
-    }, {});
-
-    let tempSum = 0, tempCount = 0;
-    let humiditySum = 0, humidityCount = 0;
-    let powerSum = 0, powerCount = 0;
-
-    assets.forEach(asset => {
-      const latest = asset.iotReadings[asset.iotReadings.length - 1];
-      if (!latest) return;
-      if (typeof latest.temperature === 'number') { tempSum += latest.temperature; tempCount += 1; }
-      if (typeof latest.humidity === 'number') { humiditySum += latest.humidity; humidityCount += 1; }
-      if (typeof latest.powerDraw === 'number') { powerSum += latest.powerDraw; powerCount += 1; }
-    });
-
-    const activeAlerts = await Alert.find({ status: { $ne: 'resolved' } });
-    const alertsBySeverity = activeAlerts.reduce((acc, a) => {
-      acc[a.severity] = (acc[a.severity] || 0) + 1;
-      return acc;
-    }, {});
-    const alertsByType = activeAlerts.reduce((acc, a) => {
-      acc[a.type] = (acc[a.type] || 0) + 1;
-      return acc;
-    }, {});
-
-    res.json({
-      totalAssets,
-      assetsByType,
-      averages: {
-        temperature: tempCount ? +(tempSum / tempCount).toFixed(2) : null,
-        humidity: humidityCount ? +(humiditySum / humidityCount).toFixed(2) : null,
-        powerDraw: powerCount ? +(powerSum / powerCount).toFixed(2) : null
-      },
-      alerts: {
-        totalActive: activeAlerts.length,
-        bySeverity: alertsBySeverity,
-        byType: alertsByType
-      }
-    });
+    const data = await computeHealthData(assets);
+    res.json(data);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
