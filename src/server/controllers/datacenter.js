@@ -113,7 +113,7 @@ export const getAllAssetsWithLatestReading = async (req, res) => {
   try {
     const assets = await Datacenter.find({})
       .populate('assetId', 'name type')
-      .populate('customerId', 'name email');
+      .populate('customerId', 'companyName');
 
     const formatted = assets.map(asset => ({
       ...asset.toObject(),
