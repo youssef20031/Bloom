@@ -1,0 +1,81 @@
+/*
+  This file contains custom CSS to enhance the UI beyond Tailwind's utilities.
+  It includes custom properties, animations, and other visual improvements.
+*/
+
+:root {
+    --primary-color: #2563eb; /* Tailwind blue-600 */
+    --secondary-color: #1f2937; /* Tailwind gray-800 */
+    --light-gray: #f9fafb; /* Tailwind gray-50 */
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    color: var(--secondary-color);
+}
+
+/* Custom gradient for hero text */
+.text-gradient {
+    background: linear-gradient(90deg, var(--primary-color), #60a5fa);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-fill-color: transparent;
+}
+
+/* Add a subtle transition to cards on hover */
+.feature-card {
+    transition: transform 0.3s ease-in-out, box-shadow 0.3s ease-in-out;
+}
+
+.feature-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+/* Button hover effect */
+.cta-button {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+}
+
+.cta-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+}
+
+/* Navigation link style */
+.nav-link {
+    position: relative;
+    transition: color 0.3s;
+}
+
+.nav-link::after {
+    content: '';
+    position: absolute;
+    width: 0;
+    height: 2px;
+    bottom: -4px;
+    left: 50%;
+    background-color: var(--primary-color);
+    transition: width 0.3s ease-in-out, left 0.3s ease-in-out;
+}
+
+.nav-link:hover::after {
+    width: 100%;
+    left: 0;
+}
+
+/* Styles for the Home component */
+
+/* Add custom component-specific styles below */
+.home-hero {
+    /* Example: background-image: url('/path/to/image.jpg'); */
+}
+
+/* ... */

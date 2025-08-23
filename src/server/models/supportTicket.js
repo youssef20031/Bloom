@@ -4,6 +4,7 @@ const supportTicketSchema = new mongoose.Schema({
   customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'Customer', required: true },
   supportAgentId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // role: 'support'
   issue: { type: String, required: true },
+  priority: { type: String, enum: ['low', 'medium', 'high'], default: 'medium' },
   status: { type: String, enum: ['open', 'in_progress', 'closed'], default: 'open' },
   history: [
     {
@@ -18,4 +19,3 @@ const supportTicketSchema = new mongoose.Schema({
 const SupportTicket = mongoose.model('SupportTicket', supportTicketSchema);
 
 export default SupportTicket;
-

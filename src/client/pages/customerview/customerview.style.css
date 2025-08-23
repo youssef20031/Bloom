@@ -1,0 +1,54 @@
+/*
+  Custom styles for the Customer Dashboard page.
+*/
+:root {
+    --primary-color: #1e3a8a;
+}
+
+body, .stat-card, table {
+    font-family: 'Inter', sans-serif;
+}
+
+.bg-primary {
+    background-color: var(--primary-color);
+}
+
+.stat-card {
+    background-color: #ffffff;
+    padding: 1rem;
+    border-radius: 0.375rem;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.status-completed {
+    color: #16a34a;
+    font-weight: 500;
+}
+
+.status-progress {
+    color: #d97706;
+    font-weight: 500;
+}
+
+.status-delayed {
+    color: #dc2626;
+    font-weight: 500;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+thead th {
+    background-color: #f9fafb;
+    font-weight: 500;
+}
+
+tbody tr:nth-child(even) {
+    background-color: #f3f4f6;
+}
+
+table th, table td {
+    padding: 0.75rem 1rem;
+}
