@@ -10,7 +10,7 @@
     "test": "jest",
     "client": "vite",
     "serve:ai": "python src/ai_service/ai_service.py",
-    "install:ai": "pip install -r src/ai_service/requirements.txt",
+    "install:ai": "pip install --no-cache-dir --break-system-packages -r src/ai_service/requirements.txt",
     "setup": "npm install && npm run install:ai",
     "start:both": "npx concurrently \"npm run dev\" \"npm run serve:ai\""
   },
@@ -46,6 +46,7 @@
     "postcss": "^8.5.6",
     "supertest": "^7.1.4",
     "tailwindcss": "^4.1.12",
-    "vite": "^6.3.3"
+    "vite": "^6.3.3",
+    "concurrently": "^8.2.1"
   }
 }
