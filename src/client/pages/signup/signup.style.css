@@ -9,23 +9,21 @@ html {
     font-family: 'Roboto', sans-serif;
 }
 
+/* This is correct: lock the overall page */
 .signup-container {
-    width: 100vw;
-    min-height: 100vh;
-    display: flex; /* Use flexbox to ensure child fills the height */
+    width: 100%;
+    height: 100vh;
+    display: flex;
+    overflow: hidden; /* This prevents the whole page from scrolling */
 }
 
-/* KEY CHANGE: Converted the wrapper to a flex container */
 .signup-wrapper {
     display: flex;
     width: 100%;
-    /* Removed fixed width and height to allow it to be responsive */
 }
 
-/* KEY CHANGE: Left panel is now a flex item */
 .signup-left-panel {
-    /* Removed position: absolute, top, left */
-    flex: 1; /* Assign a proportional size */
+    flex: 1;
     background: linear-gradient(221deg, rgba(28, 43, 64, 1) 0%);
     display: flex;
     flex-direction: column;
@@ -35,10 +33,9 @@ html {
     min-width: 300px;
 }
 
-/* Simplified positioning for the illustration and brand */
 .signup-illustration {
-    width: auto;
-    max-width: 80px; /* smaller logo image */
+    width: 100%;
+    max-width: 357px;
     height: auto;
     margin-bottom: 20px;
 }
@@ -47,33 +44,31 @@ html {
     font-family: 'Montserrat', Helvetica;
     font-weight: 500;
     color: #7086a4;
-    font-size: 16px; /* smaller Bloom text */
-    max-font-size: 32px;
+    font-size: 6vw;
+    max-font-size: 96px;
     letter-spacing: 0;
     line-height: 1.2;
     white-space: nowrap;
 }
 
-/* KEY CHANGE: Right panel is now a flex item */
+/* === KEY FIXES ARE HERE === */
 .signup-right-panel {
-    /* Removed position: absolute, top, left */
-    flex: 1.5; /* Make it take more space than the left panel */
+    flex: 1.5;
     background: white;
     display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 40px;
-    overflow-y: auto; /* Allow form to scroll on small screens */
+    justify-content: center;   /* Center the form horizontally */
+    align-items: flex-start;   /* Align the form to the top */
+    padding: 60px 40px;        /* Add vertical padding for spacing */
+    overflow-y: auto;          /* CRUCIAL: Allow THIS panel to scroll */
 }
 
-/* KEY CHANGE: Form is now centered by its flex parent */
+/* Reduced the main gap to make it more compact */
 .signup-form {
-    /* Removed position: absolute, top, left */
     display: flex;
     flex-direction: column;
     width: 100%;
-    max-width: 590px; /* Keep a max-width for readability */
-    gap: 30px;
+    max-width: 590px;
+    gap: 24px;
 }
 
 .signup-header {
@@ -104,7 +99,7 @@ html {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 24px;
+    gap: 16px;
     width: 100%;
 }
 
@@ -112,7 +107,7 @@ html {
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    gap: 12px;
+    gap: 8px;
     width: 100%;
 }
 
@@ -120,25 +115,24 @@ html {
     font-family: 'Roboto', Helvetica;
     font-weight: 500;
     color: rgba(30, 58, 97, 1);
-    font-size: 20px;
+    font-size: 18px;
     letter-spacing: -0.32px;
     line-height: 21px;
 }
 
-/* KEY CHANGE: Made input wrappers flexible */
 .signup-input-wrapper {
     display: flex;
     width: 100%;
     align-items: center;
-    padding: 16px;
+    padding: 14px;
     background: #f0f0f0;
     border-radius: 12px;
-    border: 1px solid transparent; /* default transparent border */
+    border: 1px solid transparent;
     transition: border-color 0.2s ease;
 }
 
 .signup-input-wrapper:hover {
-    border-color: #1259EC9; /* hover stroke color */
+    border-color: #1259EC99;
 }
 
 .signup-input-content {
@@ -149,18 +143,18 @@ html {
 }
 
 .signup-input-icon {
-    width: 30px;
-    height: 30px;
-    flex-shrink: 0; /* Prevent icon from shrinking */
+    width: 24px;
+    height: 24px;
+    flex-shrink: 0;
+    color: #656565;
 }
 
-/* KEY CHANGE: Input now grows to fill the space */
 .signup-input {
     width: 100%;
     font-family: 'Roboto', Helvetica;
     font-weight: 400;
     color: #656565;
-    font-size: 18px;
+    font-size: 16px;
     letter-spacing: -0.32px;
     line-height: 21px;
     background: transparent;
@@ -172,7 +166,6 @@ html {
     color: #656565;
 }
 
-/* Country code dropdown */
 .signup-country-code {
     display: flex;
     align-items: center;
@@ -183,7 +176,7 @@ html {
     background: transparent;
     border: none;
     font-family: 'Roboto', sans-serif;
-    font-size: 18px;
+    font-size: 16px;
     color: #656565;
     outline: none;
     appearance: none;
@@ -191,7 +184,6 @@ html {
     margin: 0;
 }
 
-/* KEY CHANGE: Using CSS Grid for the two-column address fields */
 .signup-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -203,8 +195,8 @@ html {
     all: unset;
     box-sizing: border-box;
     display: flex;
-    width: 100%; /* Button takes full width of the form */
-    height: 66px;
+    width: 100%;
+    height: 60px;
     align-items: center;
     justify-content: center;
     gap: 8px;
@@ -223,18 +215,25 @@ html {
     font-family: 'Roboto', Helvetica;
     font-weight: 400;
     color: white;
-    font-size: 24px;
+    font-size: 22px;
     line-height: 36px;
     white-space: nowrap;
 }
 
-/* Responsive adjustments for smaller screens */
+.signup-error {
+    color: #dc2626;
+    font-size: 14px;
+    text-align: left;
+    width: 100%;
+}
+
+/* Responsive adjustments */
 @media (max-width: 900px) {
     .signup-wrapper {
         flex-direction: column;
     }
     .signup-left-panel {
-        min-height: 300px; /* Give it some height when stacked */
+        min-height: 300px;
         flex: unset;
     }
     .signup-right-panel {
@@ -244,6 +243,6 @@ html {
 
 @media (max-width: 480px) {
     .signup-grid {
-        grid-template-columns: 1fr; /* Stack city/country on small screens */
+        grid-template-columns: 1fr;
     }
 }
