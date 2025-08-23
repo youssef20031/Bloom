@@ -8,11 +8,13 @@ import CustomerView from "./pages/customerview/customerview";
 import ITDashboard from "./pages/IT";
 import Adminview from "./pages/adminview/adminview";
 import ChatBot from "./pages/chatBot/index.jsx";
+import Support from "./pages/Support/index.jsx";
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/support" element={<Support />} />
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
         <Route path="/signup" element={<Signup />} />
@@ -20,7 +22,7 @@ function App() {
         <Route path="/dashboard" element={<CustomerView />} />
         <Route path="/it" element={<ITDashboard />} />
         <Route path="/admin" element={<Adminview />} />
-          <Route path="/chatBot" element={<ChatBot />} />
+        <Route path="/chatBot" element={<ChatBot />} />
         {/* Add more routes as needed */}
       </Routes>
     </BrowserRouter>
