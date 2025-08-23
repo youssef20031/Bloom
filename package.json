@@ -31,7 +31,8 @@
     "remark-gfm": "^4.0.1",
     "socket.io": "^4.8.1",
     "socket.io-client": "^4.8.1",
-    "vite-express": "*"
+    "vite-express": "*",
+    "wouter": "^3.7.1"
   },
   "devDependencies": {
     "@babel/preset-env": "^7.28.0",

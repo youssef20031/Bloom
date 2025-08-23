@@ -19,7 +19,9 @@ function App() {
         <Route path="/services" element={<Services />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<CustomerView />} />
+        <Route path="/dashboard" element={<CustomerView initialSection="overview" />} />
+        <Route path="/dashboard/support" element={<CustomerView initialSection="support" />} />
+        <Route path="/dashboard/info" element={<CustomerView initialSection="info" />} />
         <Route path="/it" element={<ITDashboard />} />
         <Route path="/admin" element={<Adminview />} />
         <Route path="/chatBot" element={<ChatBot />} />
