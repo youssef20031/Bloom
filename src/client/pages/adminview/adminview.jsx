@@ -3,8 +3,18 @@ import axios from "axios";
 import "./adminview.css";
 import BloomLogo from "../../assets/Bloom_Logo.svg";
 const api = axios.create({ baseURL: "http://localhost:3000/api" });
-const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
-
+function getUserFromLocalStorage() {
+    const userStr = localStorage.getItem('user');
+    if (!userStr) return null;
+    try {
+        return JSON.parse(userStr);
+    } catch (e) {
+        // Optionally log the error or clear the corrupted data
+        // localStorage.removeItem('user');
+        return null;
+    }
+}
+const user = getUserFromLocalStorage();
 function Badge({ variant = "muted", children }) {
     return <span className={`status-badge ${variant}`}>{children}</span>;
 }
