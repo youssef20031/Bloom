@@ -98,12 +98,12 @@ class AlertService {
         { new: true }
       );
       
-      if (resolvedAlert && resolvedAlert.datacenterId) {
-        await resolvedAlert.populate('datacenterId');
-      }
-      
       if (!resolvedAlert) {
         throw new Error('Alert not found');
+      }
+      
+      if (resolvedAlert.datacenterId) {
+        await resolvedAlert.populate('datacenterId');
       }
       
       console.log('✅ Alert resolved and emitted:', alertId);
