@@ -1,6 +1,9 @@
+# File: src/ai_service/ai_service.py
+
 import os
 from flask import Flask, request, jsonify, Response, send_file
-from flask_cors import CORS
+from dotenv import load_dotenv
+from flask_cors import CORS 
 from langchain_community.document_loaders import PyPDFLoader, DirectoryLoader
 from langchain_community.vectorstores import Chroma
 from langchain_core.messages import HumanMessage, AIMessage
@@ -20,7 +23,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, ListFlowabl
 from reportlab.lib.units import inch
 from reportlab.lib import colors
 
-
+load_dotenv()
 # Initialize Flask App
 app = Flask(__name__)
 CORS(app) # Enable Cross-Origin Resource Sharing
@@ -61,7 +64,7 @@ def initialize_ai_components():
     print("Vector store and retriever are ready.")
 
     print("Building the conversational RAG chain...")
-    llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.3) # Updated model
+    llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash", temperature=0.3) # Updated model
 
     contextualize_q_system_prompt = (
         "Given a chat history and the latest user question "
