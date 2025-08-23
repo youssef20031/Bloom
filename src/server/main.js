@@ -15,6 +15,9 @@ import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
 import cors from "cors";
 import chatRoutes from "./routes/chatBot.js";
+import './models/customer.js';
+import './models/user.js';
+import './models/supportTicket.js';
 
 
 dotenv.config();
@@ -39,7 +42,7 @@ app.use(express.urlencoded({ extended: true }));
 
 // Routes
 app.use("/api/customers", customerRoutes);
-app.use("/api/support-ticket", supportTicketRoutes); // Use only /api/support-ticket for support tickets
+app.use("/api/support-ticket", supportTicketRoutes); // Register support ticket routes as /api/support-ticket
 const MONGO_URI = process.env.MONGO_URI;
 mongoose.connect(MONGO_URI)
   .then(() => console.log("Successfully connected to MongoDB"))

@@ -99,8 +99,14 @@ export const updateTicketStatus = async (req, res) => {
         const { status } = req.body; // 'open' | 'in_progress' | 'closed'
         if (!status) return res.status(400).json({ message: 'Status is required' });
 
-        const ticket = await SupportTicket.findByIdAndUpdate(ticketId, { status }, { new: true });
+        let ticket = await SupportTicket.findByIdAndUpdate(ticketId, { status }, { new: true });
         if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
+
+        // Populate customerId, supportAgentId, and history.author for consistency
+        ticket = await SupportTicket.findById(ticketId)
+            .populate('customerId', 'companyName contactPerson')
+            .populate('supportAgentId', 'name email')
+            .populate('history.author', 'name email');
 
         res.json({ message: 'Status updated', ticket });
     } catch (error) {

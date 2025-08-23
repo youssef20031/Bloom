@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './support.css';
-import { getCustomerTickets } from '../../api/supportApi';
+import { listSupportTickets, getSupportTicket, updateTicketStatus } from '../../api/supportApi';
 
 export default function App() {
     const [tickets, setTickets] = useState([]);
@@ -10,10 +10,15 @@ export default function App() {
     const [showEntries, setShowEntries] = useState(10);
     const [statusFilter, setStatusFilter] = useState('all');
     const [sortOrder, setSortOrder] = useState('newest');
+    const [selectedTicketId, setSelectedTicketId] = useState(null);
+    const [ticketDetails, setTicketDetails] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [detailsLoading, setDetailsLoading] = useState(false);
+    const [detailsError, setDetailsError] = useState(null);
 
     useEffect(() => {
-        // Example: Fetch tickets for customerId 'CUST001'
-        getCustomerTickets('CUST001')
+        // Fetch all support tickets from the database
+        listSupportTickets()
             .then(data => {
                 setTickets(data);
                 setLoading(false);
@@ -56,12 +61,42 @@ export default function App() {
     </span>
     )
 
+    const handleTicketIdClick = async (ticketId) => {
+        setSelectedTicketId(ticketId);
+        setShowDetailsModal(true);
+        setDetailsLoading(true);
+        setDetailsError(null);
+        try {
+            const details = await getSupportTicket(ticketId);
+            setTicketDetails(details);
+        } catch (err) {
+            setDetailsError(err.message);
+        }
+        setDetailsLoading(false);
+    };
+
+    const handleStatusChange = async (newStatus) => {
+        if (!selectedTicketId) return;
+        setDetailsLoading(true);
+        setDetailsError(null);
+        try {
+            const updated = await updateTicketStatus(selectedTicketId, newStatus);
+            setTicketDetails(updated.ticket);
+            // Optionally update main ticket list
+            setTickets(tickets.map(t => t._id === selectedTicketId ? updated.ticket : t));
+        } catch (err) {
+            setDetailsError(err.message);
+        }
+        setDetailsLoading(false);
+    };
+
     // Filter and sort tickets
     const filteredAndSortedTickets = tickets
         .filter(ticket => {
             if (statusFilter === 'all') return true
             if (statusFilter === 'open') return ticket.status === 'open'
-            if (statusFilter === 'closed') return ticket.status === 'close'
+            if (statusFilter === 'in_progress') return ticket.status === 'in_progress'
+            if (statusFilter === 'closed') return ticket.status === 'closed'
             return true
         })
         .sort((a, b) => {
@@ -76,6 +111,13 @@ export default function App() {
 
     if (loading) return <div>Loading support tickets...</div>;
     if (error) return <div>Error: {error}</div>;
+
+    // Status options and colors
+    const statusOptions = [
+        { value: 'open', label: 'Open', color: '#28a745' },
+        { value: 'in_progress', label: 'In Progress', color: '#17a2b8' },
+        { value: 'closed', label: 'Closed', color: '#dc3545' }
+    ];
 
     return (
         <div className="app">
@@ -115,6 +157,7 @@ export default function App() {
                         >
                             <option value="all">All</option>
                             <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
                             <option value="closed">Closed</option>
                         </select>
                     </div>
@@ -151,14 +194,18 @@ export default function App() {
                         <tbody>
                         {filteredAndSortedTickets.slice((currentPage - 1) * showEntries, currentPage * showEntries).map(ticket => (
                             <tr key={ticket._id}>
-                                <td className="ticket-id">{ticket._id}</td>
-                                <td className="subject-text">{ticket.subject}</td>
+                                <td className="ticket-id">
+                                    <button style={{background:'none',border:'none',color:'#007bff',cursor:'pointer',textDecoration:'underline'}} onClick={() => handleTicketIdClick(ticket._id)}>
+                                        {ticket._id}
+                                    </button>
+                                </td>
+                                <td className="subject-text">{ticket.issue}</td>
                                 <td>
-                                    <StatusBadge status={ticket.status === 'close' ? 'closed' : ticket.status} />
+                                    <StatusBadge status={ticket.status === 'closed' ? 'closed' : ticket.status} />
                                 </td>
                                 <td className="created-at">{new Date(ticket.createdAt).toLocaleDateString()}</td>
-                                <td className="customer-name">{ticket.customer.name}</td>
-                                <td className="customer-email">{ticket.customer.email}</td>
+                                <td className="customer-name">{ticket.customerId?.companyName || ''}</td>
+                                <td className="customer-email">{ticket.customerId?.email || ''}</td>
                             </tr>
                         ))}
                         </tbody>
@@ -212,6 +259,63 @@ export default function App() {
                     </div>
                 </div>
             </main>
+
+            {/* Ticket Details Modal */}
+            {showDetailsModal && (
+                <div className="modal-overlay" style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:1000}}>
+                    <div className="modal-content" style={{background:'#fff',padding:'2rem',borderRadius:'8px',maxWidth:'600px',margin:'5% auto',position:'relative'}}>
+                        <button style={{position:'absolute',top:'1rem',right:'1rem',fontSize:'1.5rem',background:'none',border:'none',cursor:'pointer'}} onClick={()=>{setShowDetailsModal(false);setTicketDetails(null);setSelectedTicketId(null);}}>&times;</button>
+                        {detailsLoading ? <div>Loading...</div> : detailsError ? <div>Error: {detailsError}</div> : ticketDetails && (
+                            <div>
+                                <h2>Ticket Details</h2>
+                                <p><strong>ID:</strong> {ticketDetails._id}</p>
+                                <p><strong>Issue:</strong> {ticketDetails.issue}</p>
+                                <p><strong>Status:</strong> <StatusBadge status={ticketDetails.status} /></p>
+                                <p><strong>Priority:</strong> {ticketDetails.priority}</p>
+                                <p><strong>Created At:</strong> {new Date(ticketDetails.createdAt).toLocaleString()}</p>
+                                <p><strong>Customer:</strong> {ticketDetails.customerId?.companyName} ({ticketDetails.customerId?.contactPerson})</p>
+                                <p><strong>Support Agent:</strong> {ticketDetails.supportAgentId?.name || 'Unassigned'}</p>
+                                <div style={{margin:'1rem 0'}}>
+                                    <label htmlFor="status-select"><strong>Change Status:</strong></label>
+                                    <div style={{marginTop:'0.5rem'}}>
+                                        {statusOptions.map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => handleStatusChange(opt.value)}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    marginRight: '1rem',
+                                                    padding: '6px 16px',
+                                                    borderRadius: '16px',
+                                                    border: ticketDetails.status === opt.value ? '2px solid #333' : '1px solid #ccc',
+                                                    background: opt.color,
+                                                    color: '#fff',
+                                                    fontWeight: ticketDetails.status === opt.value ? 'bold' : 'normal',
+                                                    cursor: 'pointer',
+                                                    boxShadow: ticketDetails.status === opt.value ? '0 0 4px #333' : 'none',
+                                                    outline: 'none'
+                                                }}
+                                            >
+                                                <span style={{width:16,height:16,display:'inline-block',borderRadius:'50%',background:opt.color,marginRight:8,border:'2px solid #fff'}}></span>
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <h3>History</h3>
+                                    <ul>
+                                        {ticketDetails.history?.map((h,i)=>(
+                                            <li key={i}><strong>{h.author?.name || h.author}:</strong> {h.message} <em>({new Date(h.timestamp).toLocaleString()})</em></li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
