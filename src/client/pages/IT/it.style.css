@@ -79,4 +79,197 @@
 .timeline .time { color: var(--slate-600); font-size: 0.85rem; }
 .activity { display: grid; gap: 0.5rem; color: #334155; }
 
+/* Enhanced Alert Styles */
+.alert-item {
+  backdrop-filter: blur(10px);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.alert-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+  animation: shimmer 2s infinite;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.alert-item:hover::before {
+  opacity: 1;
+}
+
+.alert-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+}
+
+.alert-item:active {
+  transform: translateY(0);
+  transition: transform 0.1s ease;
+}
+
+/* Alert scroll area */
+.alert-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.3) transparent;
+}
+
+.alert-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.alert-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.alert-scroll::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.3);
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.alert-scroll::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.5);
+}
+
+/* Alert entrance animation */
+@keyframes alertSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+.alert-item {
+  animation: alertSlideIn 0.4s ease-out;
+}
+
+/* Shimmer effect */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+/* Enhanced button styles for alerts */
+.alert-item button {
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.alert-item button::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  transition: all 0.3s ease;
+  transform: translate(-50%, -50%);
+}
+
+.alert-item button:hover::before {
+  width: 100%;
+  height: 100%;
+}
+
+.alert-item button:active {
+  transform: scale(0.95);
+}
+
+/* Pulse animation for unread alerts */
+@keyframes alertPulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.3);
+  }
+  50% { 
+    box-shadow: 0 0 0 8px rgba(239, 68, 68, 0);
+  }
+}
+
+.alert-item.unread {
+  animation: alertPulse 2s infinite;
+}
+
+/* Improved severity indicators */
+.severity-critical {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  border-left-color: #dc2626 !important;
+}
+
+.severity-warning {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-left-color: #d97706 !important;
+}
+
+.severity-resolved {
+  background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+  border-left-color: #16a34a !important;
+}
+
+/* Enhanced notification bell */
+.notification-bell {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.notification-bell:hover {
+  transform: rotate(15deg);
+}
+
+.notification-count {
+  animation: bounce 0.5s ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+}
+
+/* Status indicators */
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.status-new {
+  background: linear-gradient(135deg, #fee2e2, #fecaca);
+  color: #991b1b;
+  border-color: rgba(220, 38, 38, 0.2);
+}
+
+.status-acknowledged {
+  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
+  color: #3730a3;
+  border-color: rgba(79, 70, 229, 0.2);
+}
+
+.status-resolved {
+  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
+  color: #14532d;
+  border-color: rgba(22, 163, 74, 0.2);
+}
+
 
