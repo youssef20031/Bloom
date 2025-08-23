@@ -1063,7 +1063,7 @@ export default function Dashboard() {
                 }
             >
                 {/* DETAILS MODAL */}
-                {modalType === "details" && selected && (
+                {modalType === "details" && currentView === "Customer" && selected && (
                     <div className="modal-content">
                         {selected.contactPerson && (
                             <div className="info-row">
@@ -1105,6 +1105,133 @@ export default function Dashboard() {
                         ) : (
                             <div className="info-item">No products purchased.</div>
                         )}
+                    </div>
+                )}
+                {modalType === "details" && currentView === "Employee" && selected && (
+                    <div className="modal-content">
+                        <div className="info-row"><b>Name:</b> {selected.name}</div>
+                        <div className="info-row"><b>Email:</b> {selected.email}</div>
+                        <div className="info-row"><b>Role:</b> {selected.role}</div>
+                        <div className="info-row"><b>Created At:</b> {new Date(selected.createdAt).toLocaleDateString()}</div>
+
+                        <div className="modal-actions">
+                            <button>Edit</button>
+                            <button
+                                className="danger-btn"
+                                onClick={async () => {
+                                    if (selected._id === user?._id) {
+                                        alert("⚠️ You cannot deactivate yourself!");
+                                        return;
+                                    }
+                                    if (!window.confirm("Are you sure you want to deactivate this employee?")) return;
+
+                                    try {
+                                        await api.delete(`/users/${selected._id}`);
+                                        setEntities((prev) => prev.filter((e) => e._id !== selected._id));
+                                        setSelected(null);
+                                        setModalType(null);
+                                    } catch (err) {
+                                        alert("Failed to deactivate employee: " + (err.response?.data?.error || err.message));
+                                    }
+                                }}
+                            >
+                                Deactivate
+                            </button>
+                        </div>
+                    </div>
+                )}
+                {modalType === "details" && currentView === "Product" && selected && (
+                    <div className="modal-content">
+                        <div className="info-row"><b>Name:</b> {selected.name}</div>
+                        <div className="info-row"><b>Description:</b> {selected.description || "—"}</div>
+                        <div className="info-row"><b>Type:</b> {selected.type}</div>
+                        <div className="info-row"><b>Vendor:</b> {selected.vendor || "—"}</div>
+                        <div className="info-row"><b>Stock:</b> {selected.stock}</div>
+                        <div className="info-row"><b>Price:</b> ${selected.price}</div>
+
+                        {/* Hardware info */}
+                        <h4>Hardware Tracking</h4>
+                        <div className="info-row"><b>Serial Number:</b> {selected.serialNumber || "—"}</div>
+                        <div className="info-row"><b>Model:</b> {selected.model || "—"}</div>
+                        <div className="info-row"><b>Status:</b> {selected.status}</div>
+
+                        {/* Location */}
+                        <h4>Location</h4>
+                        <div className="info-row"><b>Datacenter:</b> {selected.location?.datacenter || "—"}</div>
+                        <div className="info-row"><b>Rack:</b> {selected.location?.rack || "—"}</div>
+                        <div className="info-row"><b>Position:</b> {selected.location?.position || "—"}</div>
+
+                        {/* Maintenance */}
+                        <h4>Maintenance</h4>
+                        <div className="info-row"><b>Purchase Date:</b> {selected.purchaseDate ? new Date(selected.purchaseDate).toLocaleDateString() : "—"}</div>
+                        <div className="info-row"><b>Warranty Expiry:</b> {selected.warrantyExpiry ? new Date(selected.warrantyExpiry).toLocaleDateString() : "—"}</div>
+                        <div className="info-row"><b>Last Maintenance:</b> {selected.lastMaintenance ? new Date(selected.lastMaintenance).toLocaleDateString() : "—"}</div>
+                        <div className="info-row"><b>Next Maintenance:</b> {selected.nextMaintenance ? new Date(selected.nextMaintenance).toLocaleDateString() : "—"}</div>
+
+                        <div className="modal-actions">
+                            <button>Edit</button>
+                            <button>Retire</button>
+                        </div>
+                    </div>
+                )}
+                {modalType === "details" && currentView === "DC" && selected && (
+                    <div className="modal-content">
+                        <div className="info-row"><b>Location:</b> {selected.location}</div>
+                        <div className="info-row"><b>Asset Type:</b> {selected.assetType}</div>
+                        <div className="info-row"><b>Asset:</b> {selected.assetId?.name || "—"}</div>
+                        <div className="info-row"><b>Customer:</b> {selected.customerId?.companyName || "—"}</div>
+                        <h4>Latest IoT Reading</h4>
+                        {(selected.iotReadings || []).length > 0 ? (
+                            (() => {
+                                const latest = [...selected.iotReadings].sort(
+                                    (a, b) => new Date(b.timestamp) - new Date(a.timestamp)
+                                )[0]; // get the latest one
+                                return (
+                                    <div className="info-item">
+                                        <div><b>Timestamp:</b> {new Date(latest.timestamp).toLocaleString()}</div>
+                                        {"temperature" in latest && <div><b>Temperature:</b> {latest.temperature}°C</div>}
+                                        {"powerDraw" in latest && <div><b>Power raw:</b> {latest.powerDraw}W</div>}
+                                        {"humidity" in latest && <div><b>Humidity:</b> {latest.humidity}%</div>}
+                                    </div>
+                                );
+                            })()
+                        ) : (
+                            <div className="info-item">No IoT readings available.</div>
+                        )}
+                    </div>
+                )}
+                {modalType === "details" && currentView === "Service" && selected && (
+                    <div className="modal-content">
+                        <div className="info-row"><b>Name:</b> {selected.name}</div>
+                        <div className="info-row"><b>Description:</b> {selected.description || "—"}</div>
+                        <div className="info-row"><b>Type:</b> {selected.type}</div>
+                        <div className="info-row"><b>Datacenter Location:</b> {selected.hostingDetails?.datacenterLocation || "—"}</div>
+
+                        {/* Associated products */}
+                        <h4>Associated Products</h4>
+                        {(selected.associatedProducts || []).length > 0 ? (
+                            Object.entries(
+                                selected.associatedProducts.reduce((acc, prodId) => {
+                                    acc[prodId] = (acc[prodId] || 0) + 1;
+                                    return acc;
+                                }, {})
+                            ).map(([prodId, qty], idx) => {
+                                const product = products.find((p) => p._id === prodId);
+                                return (
+                                    <div key={idx} className="info-item">
+                                        {product ? product.name : prodId} — x{qty}
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="info-item">No products linked.</div>
+                        )}
+
+
+                        <div className="modal-actions">
+                            <button>Edit</button>
+                            <button>Assign to Customer</button>
+                        </div>
                     </div>
                 )}
 

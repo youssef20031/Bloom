@@ -612,3 +612,21 @@ body {
   border-color: #333;           /* darker border on focus */
   box-shadow: 0 0 4px rgba(0,0,0,0.3);
 }
+.danger-btn {
+  background-color: #e53935; /* red */
+  color: white;
+  border: none;
+  padding: 10px 16px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, transform 0.1s ease;
+}
+
+.danger-btn:hover {
+  background-color: #c62828; /* darker red */
+}
+
+.danger-btn:active {
+  transform: scale(0.95);
+}
