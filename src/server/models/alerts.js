@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
 const alertSchema = new mongoose.Schema({
-  datacenterId: { type: mongoose.Schema.Types.ObjectId, ref: 'Datacenter', required: true },
+  datacenterId: { type: mongoose.Schema.Types.ObjectId, ref: 'Datacenter', required: false },
   type: { type: String, enum: ['temperature', 'humidity', 'power', 'security', 'smoke'], required: true },
   severity: { type: String, enum: ['warning', 'critical'], required: true },
   message: { type: String, required: true },
