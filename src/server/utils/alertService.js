@@ -63,12 +63,12 @@ class AlertService {
         { new: true }
       );
       
-      if (updatedAlert && updatedAlert.datacenterId) {
-        await updatedAlert.populate('datacenterId');
-      }
-      
       if (!updatedAlert) {
         throw new Error('Alert not found');
+      }
+      
+      if (updatedAlert.datacenterId) {
+        await updatedAlert.populate('datacenterId');
       }
       
       console.log('📝 Alert updated and emitted:', alertId);
@@ -98,12 +98,12 @@ class AlertService {
         { new: true }
       );
       
-      if (resolvedAlert && resolvedAlert.datacenterId) {
-        await resolvedAlert.populate('datacenterId');
-      }
-      
       if (!resolvedAlert) {
         throw new Error('Alert not found');
+      }
+      
+      if (resolvedAlert.datacenterId) {
+        await resolvedAlert.populate('datacenterId');
       }
       
       console.log('✅ Alert resolved and emitted:', alertId);
