@@ -7,9 +7,9 @@ export default defineConfig({
     server: {
         proxy: {
             // This tells Vite to forward any request that starts with /api
-            // to your backend server running on http://localhost:3001
+            // to your backend server running on http://localhost:3000
             '/api': {
-                target: 'http://localhost:3001',
+                target: 'http://localhost:3000',
                 changeOrigin: true, // Recommended for avoiding CORS issues
                 secure: false,      // Allows proxying to HTTP servers
             },

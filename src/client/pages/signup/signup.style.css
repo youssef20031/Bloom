@@ -37,8 +37,8 @@ html {
 
 /* Simplified positioning for the illustration and brand */
 .signup-illustration {
-    width: 100%;
-    max-width: 357px;
+    width: auto;
+    max-width: 80px; /* smaller logo image */
     height: auto;
     margin-bottom: 20px;
 }
@@ -47,8 +47,8 @@ html {
     font-family: 'Montserrat', Helvetica;
     font-weight: 500;
     color: #7086a4;
-    font-size: 6vw; /* Responsive font size */
-    max-font-size: 96px;
+    font-size: 16px; /* smaller Bloom text */
+    max-font-size: 32px;
     letter-spacing: 0;
     line-height: 1.2;
     white-space: nowrap;

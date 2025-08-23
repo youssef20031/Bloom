@@ -39,7 +39,7 @@ body {
 .header-left {
   display: flex;
   align-items: center;
-  gap: 32px;
+  gap: 8px;
 }
 
 .logo-section {
@@ -58,6 +58,16 @@ body {
   font-weight: 700;
   color: #1e293b;
   margin: 0;
+}
+
+/* Logo sizing */
+.logo-img {
+  width: 24px;
+  height: 24px;
+}
+.logo-text {
+  font-size: 14px;
+  font-weight: 700;
 }
 
 .main-nav {
