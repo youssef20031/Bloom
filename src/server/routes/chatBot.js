@@ -8,6 +8,7 @@ import {
     getSessions,
     getSessionById,
     updateSessionStatus,
+    deleteSession
 } from '../controllers/chatBot.js';
 
 const router = Router();
@@ -41,5 +42,6 @@ router.get('/sessions/:id', getSessionById);
 // PATCH to update a session's status
 router.patch('/sessions/:id/status', updateSessionStatus);
 
+router.delete('/sessions/:id', deleteSession);
 
 export default router;

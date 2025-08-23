@@ -189,3 +189,18 @@ export const updateSessionStatus = async (req, res) => {
         res.status(500).json({ error: 'Failed to update status' });
     }
 };
+export const deleteSession = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const deletedSession = await ChatSession.findByIdAndDelete(id);
+
+        if (!deletedSession) {
+            return res.status(404).json({ error: 'Session not found' });
+        }
+
+        res.status(200).json({ message: 'Session deleted successfully' });
+    } catch (e) {
+        console.error('Failed to delete session:', e);
+        res.status(500).json({ error: 'Failed to delete session' });
+    }
+};

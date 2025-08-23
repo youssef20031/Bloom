@@ -140,8 +140,8 @@ export default function SignUp() {
                 <div className="signup-input-wrapper">
                   <div className="signup-input-content">
                     <svg className="signup-input-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="#656565" strokeWidth="2" />
-                      <path d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11" stroke="#656565" strokeWidth="2" />
+                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
+                      <path d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11" stroke="currentColor" strokeWidth="2" />
                     </svg>
                     <input
                       id="password-input"
@@ -164,8 +164,8 @@ export default function SignUp() {
                 <div className="signup-input-wrapper">
                   <div className="signup-input-content">
                     <svg className="signup-input-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="#656565" strokeWidth="2" />
-                      <path d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11" stroke="#656565" strokeWidth="2" />
+                      <rect x="3" y="11" width="18" height="11" rx="2" stroke="currentColor" strokeWidth="2" />
+                      <path d="M7 11V7C7 4.23858 9.23858 2 12 2C14.7614 2 17 4.23858 17 7V11" stroke="currentColor" strokeWidth="2" />
                     </svg>
                     <input
                       id="confirm-password-input"
@@ -192,7 +192,6 @@ export default function SignUp() {
                       <select
                         className="signup-country-select"
                         defaultValue="+20"
-                        onChange={e => handleInputChange('phoneNumber', e.target.value)}
                       >
                         <option value="+20">🇪🇬 +20</option>
                         <option value="+1">🇺🇸 +1</option>
@@ -270,7 +269,8 @@ export default function SignUp() {
               </div>
             </div>
 
-            {error && <p className="text-red-600 text-sm">{error}</p>}
+            {error && <p className="signup-error">{error}</p>}
+
             <button type="submit" className="signup-submit-btn">
               <span className="signup-submit-text">Sign Up</span>
             </button>
