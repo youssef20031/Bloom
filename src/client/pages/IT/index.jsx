@@ -580,7 +580,7 @@ export default function ITDashboard() {
 			label: 'datacenter assets', 
 			key: 'assets' 
 		},
-		{ url: '/api/service', setter: setChanges, label: 'services', key: 'services' },
+		{ url: '/api/request-change/approved?tag=dc', setter: setChanges, label: 'requested services', key: 'changes' },
 		{ url: '/api/datacenter/health/overview', setter: setHealthOverview, label: 'health overview', key: 'health' },
 		{ url: '/api/users', setter: setUsers, label: 'users', key: 'users' },
 		{ url: '/api/alerts', setter: setAlerts, label: 'alerts', key: 'alerts' }
@@ -738,8 +738,9 @@ export default function ITDashboard() {
 		return changes.filter(c => {
 			if (!c || typeof c !== 'object') return false;
 			return (
-				(c.name || '').toString().toLowerCase().includes(term) ||
-				(c.type || '').toString().toLowerCase().includes(term)
+				(c.supportTicketId?.issue || '').toString().toLowerCase().includes(term) ||
+				(c.description || '').toString().toLowerCase().includes(term) ||
+				(c.status || '').toString().toLowerCase().includes(term)
 			);
 		});
 	}, [changes, searchTerm]);
@@ -1645,14 +1646,14 @@ export default function ITDashboard() {
 											<th>Last Reading</th>
 										</tr>
 									)}
-									{activeTab === 'Changes' && (
-										<tr>
-											<th>Service Name</th>
-											<th>Type</th>
-											<th>Created</th>
-											<th>Updated</th>
-										</tr>
-									)}
+																{activeTab === 'Changes' && (
+								<tr>
+									<th>Ticket Issue</th>
+									<th>Description</th>
+									<th>Created Time</th>
+									<th>Status</th>
+								</tr>
+							)}
 									{activeTab === 'Users' && (
 										<tr>
 											<th>Name</th>
@@ -1756,34 +1757,42 @@ export default function ITDashboard() {
 											</tr>
 										)
 									)}
-									{activeTab === 'Changes' && (
-										paginatedData.length > 0 ? (
-											paginatedData.map((c) => {
-												if (!c || !c._id) {
-													console.warn('⚠️ Invalid change row:', c);
-													return null;
-												}
-												return (
-													<tr key={c._id}>
-														<td>{c.name || 'Unnamed service'}</td>
-														<td>{c.type || 'Unknown'}</td>
-														<td>{c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A'}</td>
-														<td>{c.updatedAt ? new Date(c.updatedAt).toLocaleString() : 'N/A'}</td>
-													</tr>
-												);
-											}).filter(Boolean)
-										) : (
-											<tr>
-												<td colSpan="4" className="text-center py-8 text-gray-500">
-													<div className="flex flex-col items-center">
-														<Wrench className="w-8 h-8 text-gray-400 mb-2" />
-														<span>No change requests found</span>
-														<span className="text-sm mt-1">Submit change requests for service modifications</span>
-													</div>
-												</td>
-											</tr>
-										)
-									)}
+																	{activeTab === 'Changes' && (
+									paginatedData.length > 0 ? (
+										paginatedData.map((c) => {
+											if (!c || !c._id) {
+												console.warn('⚠️ Invalid change row:', c);
+												return null;
+											}
+											return (
+												<tr key={c._id}>
+													<td>{c.supportTicketId?.issue || 'No ticket issue'}</td>
+													<td>{c.description || 'No description'}</td>
+													<td>{c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A'}</td>
+													<td>
+														<span className={`px-2 py-1 rounded-full text-xs font-medium ${
+															c.status === 'approved' ? 'bg-green-100 text-green-800' :
+															c.status === 'not_approved' ? 'bg-red-100 text-red-800' :
+															'bg-yellow-100 text-yellow-800'
+														}`}>
+															{c.status || 'pending'}
+														</span>
+													</td>
+												</tr>
+											);
+										}).filter(Boolean)
+									) : (
+										<tr>
+											<td colSpan="4" className="text-center py-8 text-gray-500">
+												<div className="flex flex-col items-center">
+													<Wrench className="w-8 h-8 text-gray-400 mb-2" />
+													<span>No change requests found</span>
+													<span className="text-sm mt-1">Submit change requests for service modifications</span>
+												</div>
+											</td>
+										</tr>
+									)
+								)}
 									{activeTab === 'Users' && (
 										paginatedData.length > 0 ? (
 											paginatedData.map((u) => {
