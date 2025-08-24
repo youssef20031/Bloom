@@ -10,7 +10,6 @@ import Adminview from "./pages/adminview/adminview";
 import ChatBot from "./pages/chatBot/index.jsx";
 import Support from "./pages/Support/index.jsx";
 import MqttLiveDashboard from "./pages/IT/index.jsx";
-import IoTDashboard from "./pages/IT/test.jsx";
 function App() {
   return (
     <BrowserRouter>
@@ -27,7 +26,6 @@ function App() {
         <Route path="/dashboard/orders" element={<CustomerView initialSection="orders" />} />
         <Route path="/dashboard/info" element={<CustomerView initialSection="info" />} />
         <Route path="/it" element={<ITDashboard />} />
-        <Route path="/iot" element={<IoTDashboard />} />
         <Route path="/admin" element={<Adminview />} />
         <Route path="/chatBot" element={<ChatBot />} />
         {/* Add more routes as needed */}
