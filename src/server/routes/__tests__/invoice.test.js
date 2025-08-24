@@ -87,4 +87,17 @@ describe('Invoice API', () => {
     expect(res.statusCode).toEqual(200);
     expect(res.body.message).toBe('Invoice deleted successfully');
   });
+
+  it('should return a PDF for an invoice', async () => {
+    const invoice = new Invoice({ customerId: user._id, invoiceNumber: 'INV-PDF-1', amount: 425.5, dueDate: new Date(), status: 'unpaid', lineItems: [ { description: 'Consulting Hours', quantity: 5, unitPrice: 50 }, { description: 'Support Plan', quantity: 1, unitPrice: 175.5 } ] });
+    await invoice.save();
+
+    const res = await request(app).get(`/api/invoices/${invoice._id}/pdf`);
+    expect(res.statusCode).toBe(200);
+    expect(res.headers['content-type']).toMatch(/application\/pdf/);
+    // Basic PDF signature check (first bytes should include %PDF)
+    const buf = res.body instanceof Buffer ? res.body : Buffer.from(res.body);
+    const signature = buf.subarray(0,4).toString();
+    expect(signature).toBe('%PDF');
+  });
 });

@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Home from "./pages/Home/home";
 import Services from "./pages/Services";
 import Signup from "./pages/signup/signup";
@@ -19,8 +19,11 @@ function App() {
         <Route path="/services" element={<Services />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/dashboard" element={<CustomerView initialSection="overview" />} />
+        <Route path="/dashboard" element={<Navigate to="/dashboard/overview" replace />} />
+        <Route path="/dashboard/overview" element={<CustomerView initialSection="overview" />} />
         <Route path="/dashboard/support" element={<CustomerView initialSection="support" />} />
+        <Route path="/dashboard/billing" element={<CustomerView initialSection="billing" />} />
+        <Route path="/dashboard/orders" element={<CustomerView initialSection="orders" />} />
         <Route path="/dashboard/info" element={<CustomerView initialSection="info" />} />
         <Route path="/it" element={<ITDashboard />} />
         <Route path="/admin" element={<Adminview />} />
