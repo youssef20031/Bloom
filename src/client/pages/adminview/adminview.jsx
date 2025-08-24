@@ -3,6 +3,9 @@ import axios from "axios";
 import "./adminview.css";
 import BloomLogo from "../../assets/Bloom_Logo.svg";
 const api = axios.create({ baseURL: "http://localhost:3000/api" });
+import { toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { ToastContainer } from "react-toastify";
 function getUserFromLocalStorage() {
     const userStr = localStorage.getItem('user');
     if (!userStr) return null;
@@ -94,8 +97,15 @@ export default function Dashboard() {
         customerId: "",
         ipAddress: "",
     });
-
+    const [editMode, setEditMode] = useState(false);
     const [serviceErrors, setServiceErrors] = useState({});
+    const [openSection, setOpenSection] = useState(null);
+    const [assignMode, setAssignMode] = useState(false);
+    const [selectedCustomer, setSelectedCustomer] = useState("");
+    const [ipAddress, setIpAddress] = useState("");
+    const toggleSection = (section) => {
+        setOpenSection(openSection === section ? null : section);
+    };
     const validateService = () => {
         const errors = {};
         if (!newService.name?.trim()) errors.name = "Name is required.";
@@ -218,6 +228,7 @@ export default function Dashboard() {
             setNewEmployee({ name: "", email: "", password: "", role: "admin" });
             setEmployeeErrors({});
             setModalType(null);
+            toast.success("✅ Employee Added successfully!");
         } catch (e) {
             setEmployeeErrors({ general: e?.response?.data?.message || e.message });
         }
@@ -271,6 +282,7 @@ export default function Dashboard() {
             setSpecText("{}");
             setProductErrors({});
             setModalType(null);
+            toast.success("✅ Product Added successfully!");
         } catch (err) {
             setProductErrors((p) => ({
                 ...p,
@@ -306,6 +318,7 @@ export default function Dashboard() {
             setModalType(null);
             setNewDC({ location: "", assetType: "", assetId: "", customerId: "" });
             setDcErrors({});
+            toast.success("✅ DC added successfully!");
         } catch (e) {
             setDcErrors({ general: e?.response?.data?.message || "Failed to save datacenter" });
         }
@@ -374,6 +387,7 @@ export default function Dashboard() {
             setEntities(refreshed.data || []);
             setModalType(null);
             setNewService({});
+            toast.success("✅ Service Added successfully!");
         } catch (err) {
             console.error("Error saving service", err);
         }
@@ -1057,6 +1071,8 @@ export default function Dashboard() {
                     setProductErrors({});
                     setNewDC({ location: "", assetType: "", assetId: "", customerId: "" });
                     setDcErrors({});
+                    setEditMode(false);
+                    setAssignMode(false);
                 }}
                 title={
                     modalType === "details"
@@ -1119,69 +1135,344 @@ export default function Dashboard() {
                 )}
                 {modalType === "details" && currentView === "Employee" && selected && (
                     <div className="modal-content">
-                        <div className="info-row"><b>Name:</b> {selected.name}</div>
-                        <div className="info-row"><b>Email:</b> {selected.email}</div>
-                        <div className="info-row"><b>Role:</b> {selected.role}</div>
-                        <div className="info-row"><b>Created At:</b> {new Date(selected.createdAt).toLocaleDateString()}</div>
+                        {!editMode ? (
+                            // DETAILS VIEW
+                            <>
+                                <div className="info-row"><b>Name:</b> {selected.name}</div>
+                                <div className="info-row"><b>Email:</b> {selected.email}</div>
+                                <div className="info-row"><b>Role:</b> {selected.role}</div>
+                                <div className="info-row"><b>Created At:</b> {new Date(selected.createdAt).toLocaleDateString()}</div>
 
-                        <div className="modal-actions">
-                            <button>Edit</button>
-                            <button
-                                className="danger-btn"
-                                onClick={async () => {
-                                    if (selected._id === user?._id) {
-                                        alert("⚠️ You cannot deactivate yourself!");
-                                        return;
-                                    }
-                                    if (!window.confirm("Are you sure you want to deactivate this employee?")) return;
+                                <div className="modal-actions">
+                                    <button onClick={() => setEditMode(true)}>Edit</button>
+                                    <button
+                                        className="danger-btn"
+                                        onClick={async () => {
+                                            if (selected._id === user?._id) {
+                                                alert("⚠️ You cannot deactivate yourself!");
+                                                return;
+                                            }
+                                            if (!window.confirm("Are you sure you want to deactivate this employee?")) return;
 
-                                    try {
-                                        await api.delete(`/users/${selected._id}`);
-                                        setEntities((prev) => prev.filter((e) => e._id !== selected._id));
-                                        setSelected(null);
-                                        setModalType(null);
-                                    } catch (err) {
-                                        alert("Failed to deactivate employee: " + (err.response?.data?.error || err.message));
-                                    }
-                                }}
-                            >
-                                Deactivate
-                            </button>
-                        </div>
+                                            try {
+                                                await api.delete(`/users/${selected._id}`);
+                                                setEntities((prev) => prev.filter((e) => e._id !== selected._id));
+                                                setSelected(null);
+                                                setModalType(null);
+                                                toast.success("✅ Employee Deleted successfully!");
+                                            } catch (err) {
+                                                alert("Failed to deactivate employee: " + (err.response?.data?.error || err.message));
+                                            }
+                                        }}
+                                    >
+                                        Deactivate
+                                    </button>
+                                </div>
+                            </>
+                        ) : (
+                            // EDIT VIEW
+                            <>
+                                <h3>Edit Employee</h3>
+                                <div className="form-field">
+                                    <label>Name:</label>
+                                    <input
+                                        type="text"
+                                        value={selected.name}
+                                        onChange={(e) =>
+                                            setSelected((prev) => ({ ...prev, name: e.target.value }))
+                                        }
+                                    />
+                                </div>
+                                <div className="form-field">
+                                    <label>Email:</label>
+                                    <input
+                                        type="email"
+                                        value={selected.email}
+                                        onChange={(e) =>
+                                            setSelected((prev) => ({ ...prev, email: e.target.value }))
+                                        }
+                                    />
+                                </div>
+                                {selected._id !== user?._id && (
+                                    <div className="form-field">
+                                        <label>Role:</label>
+                                        <select
+                                            value={selected.role}
+                                            onChange={(e) =>
+                                                setSelected((prev) => ({ ...prev, role: e.target.value }))
+                                            }
+                                        >
+                                            <option value="" disabled>
+                                                Choose a role
+                                            </option>
+                                            <option value="admin">Admin</option>
+                                            <option value="presales">Presales</option>
+                                            <option value="support">Support</option>
+                                            <option value="it">IT</option>
+                                        </select>
+                                    </div>
+                                )}
+
+
+                                <div className="modal-actions">
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                console.log(selected);
+                                                const { data } = await api.put(`/users/${selected._id}`, { "name": selected.name, "email": selected.email, "role": selected.role });
+                                                setEntities((prev) =>
+                                                    prev.map((e) => (e._id === data._id ? data : e))
+                                                );
+                                                setEditMode(false); // back to details view
+                                                setModalType(null);
+                                                toast.success("✅ Employee updated successfully!");
+                                            } catch (err) {
+                                                alert("Failed to update employee: " + (err.response?.data?.error || err.message));
+                                            }
+                                        }}
+                                    >
+                                        Save
+                                    </button>
+                                    <button onClick={() => setEditMode(false)}>Cancel</button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
                 {modalType === "details" && currentView === "Product" && selected && (
                     <div className="modal-content">
-                        <div className="info-row"><b>Name:</b> {selected.name}</div>
-                        <div className="info-row"><b>Description:</b> {selected.description || "—"}</div>
-                        <div className="info-row"><b>Type:</b> {selected.type}</div>
-                        <div className="info-row"><b>Vendor:</b> {selected.vendor || "—"}</div>
-                        <div className="info-row"><b>Stock:</b> {selected.stock}</div>
-                        <div className="info-row"><b>Price:</b> ${selected.price}</div>
+                        {!editMode ? (
+                            // ================= DETAILS VIEW =================
+                            <>
+                                <div className="info-row"><b>Name:</b> {selected.name}</div>
+                                <div className="info-row"><b>Description:</b> {selected.description || "—"}</div>
+                                <div className="info-row"><b>Type:</b> {selected.type}</div>
+                                <div className="info-row"><b>Vendor:</b> {selected.vendor || "—"}</div>
+                                <div className="info-row"><b>Stock:</b> {selected.stock ?? "—"}</div>
+                                <div className="info-row"><b>Price:</b> ${selected.price ?? "—"}</div>
 
-                        {/* Hardware info */}
-                        <h4>Hardware Tracking</h4>
-                        <div className="info-row"><b>Serial Number:</b> {selected.serialNumber || "—"}</div>
-                        <div className="info-row"><b>Model:</b> {selected.model || "—"}</div>
-                        <div className="info-row"><b>Status:</b> {selected.status}</div>
+                                <h4>Hardware Tracking</h4>
+                                <div className="info-row"><b>Serial Number:</b> {selected.serialNumber || "—"}</div>
+                                <div className="info-row"><b>Model:</b> {selected.model || "—"}</div>
+                                <div className="info-row"><b>Status:</b> {selected.status}</div>
 
-                        {/* Location */}
-                        <h4>Location</h4>
-                        <div className="info-row"><b>Datacenter:</b> {selected.location?.datacenter || "—"}</div>
-                        <div className="info-row"><b>Rack:</b> {selected.location?.rack || "—"}</div>
-                        <div className="info-row"><b>Position:</b> {selected.location?.position || "—"}</div>
+                                <h4>Location</h4>
+                                <div className="info-row"><b>Datacenter:</b> {selected.location?.datacenter || "—"}</div>
+                                <div className="info-row"><b>Rack:</b> {selected.location?.rack || "—"}</div>
+                                <div className="info-row"><b>Position:</b> {selected.location?.position || "—"}</div>
 
-                        {/* Maintenance */}
-                        <h4>Maintenance</h4>
-                        <div className="info-row"><b>Purchase Date:</b> {selected.purchaseDate ? new Date(selected.purchaseDate).toLocaleDateString() : "—"}</div>
-                        <div className="info-row"><b>Warranty Expiry:</b> {selected.warrantyExpiry ? new Date(selected.warrantyExpiry).toLocaleDateString() : "—"}</div>
-                        <div className="info-row"><b>Last Maintenance:</b> {selected.lastMaintenance ? new Date(selected.lastMaintenance).toLocaleDateString() : "—"}</div>
-                        <div className="info-row"><b>Next Maintenance:</b> {selected.nextMaintenance ? new Date(selected.nextMaintenance).toLocaleDateString() : "—"}</div>
+                                <h4>Maintenance</h4>
+                                <div className="info-row"><b>Purchase Date:</b> {selected.purchaseDate ? new Date(selected.purchaseDate).toLocaleDateString() : "—"}</div>
+                                <div className="info-row"><b>Warranty Expiry:</b> {selected.warrantyExpiry ? new Date(selected.warrantyExpiry).toLocaleDateString() : "—"}</div>
+                                <div className="info-row"><b>Last Maintenance:</b> {selected.lastMaintenance ? new Date(selected.lastMaintenance).toLocaleDateString() : "—"}</div>
+                                <div className="info-row"><b>Next Maintenance:</b> {selected.nextMaintenance ? new Date(selected.nextMaintenance).toLocaleDateString() : "—"}</div>
 
-                        <div className="modal-actions">
-                            <button>Edit</button>
-                            <button>Retire</button>
-                        </div>
+                                <div className="modal-actions">
+                                    <button onClick={() => setEditMode(true)}>Edit</button>
+                                </div>
+                            </>
+                        ) : (
+                            // ================= EDIT VIEW =================
+                            <>
+                                <h3>Edit Product</h3>
+
+                                {/* Collapsible Section: General Info */}
+                                <div className="collapsible">
+                                    <h4 onClick={() => toggleSection("general")}>General Info</h4>
+                                    {openSection === "general" && (
+                                        <>
+                                            <div className="form-field">
+                                                <label>Name:</label>
+                                                <input
+                                                    type="text"
+                                                    value={selected.name || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, name: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Description:</label>
+                                                <textarea
+                                                    value={selected.description || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, description: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Type:</label>
+                                                <select
+                                                    value={selected.type || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, type: e.target.value }))}
+                                                >
+                                                    <option value="ai_model">AI Model</option>
+                                                    <option value="server">Server</option>
+                                                    <option value="storage">Storage</option>
+                                                    <option value="network">Network</option>
+                                                    <option value="gpu">GPU</option>
+                                                    <option value="cpu">CPU</option>
+                                                    <option value="memory">Memory</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Vendor:</label>
+                                                <input
+                                                    type="text"
+                                                    value={selected.vendor || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, vendor: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Stock:</label>
+                                                <input
+                                                    type="number"
+                                                    value={selected.stock ?? ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, stock: Number(e.target.value) }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Price:</label>
+                                                <input
+                                                    type="number"
+                                                    value={selected.price ?? ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, price: Number(e.target.value) }))}
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Collapsible Section: Hardware */}
+                                <div className="collapsible">
+                                    <h4 onClick={() => toggleSection("hardware")}>Hardware</h4>
+                                    {openSection === "hardware" && (
+                                        <>
+                                            <div className="form-field">
+                                                <label>Serial Number:</label>
+                                                <input
+                                                    type="text"
+                                                    value={selected.serialNumber || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, serialNumber: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Model:</label>
+                                                <input
+                                                    type="text"
+                                                    value={selected.model || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, model: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Status:</label>
+                                                <select
+                                                    value={selected.status || "available"}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, status: e.target.value }))}
+                                                >
+                                                    <option value="available">Available</option>
+                                                    <option value="allocated">Allocated</option>
+                                                    <option value="maintenance">Maintenance</option>
+                                                    <option value="retired">Retired</option>
+                                                    <option value="faulty">Faulty</option>
+                                                </select>
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Collapsible Section: Location */}
+                                <div className="collapsible">
+                                    <h4 onClick={() => toggleSection("location")}>Location</h4>
+                                    {openSection === "location" && (
+                                        <>
+                                            <div className="form-field">
+                                                <label>Datacenter:</label>
+                                                <input
+                                                    type="text"
+                                                    value={selected.location?.datacenter || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, location: { ...prev.location, datacenter: e.target.value } }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Rack:</label>
+                                                <input
+                                                    type="text"
+                                                    value={selected.location?.rack || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, location: { ...prev.location, rack: e.target.value } }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Position:</label>
+                                                <input
+                                                    type="text"
+                                                    value={selected.location?.position || ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, location: { ...prev.location, position: e.target.value } }))}
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Collapsible Section: Maintenance */}
+                                <div className="collapsible">
+                                    <h4 onClick={() => toggleSection("maintenance")}>Maintenance</h4>
+                                    {openSection === "maintenance" && (
+                                        <>
+                                            <div className="form-field">
+                                                <label>Purchase Date:</label>
+                                                <input
+                                                    type="date"
+                                                    value={selected.purchaseDate ? new Date(selected.purchaseDate).toISOString().split("T")[0] : ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, purchaseDate: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Warranty Expiry:</label>
+                                                <input
+                                                    type="date"
+                                                    value={selected.warrantyExpiry ? new Date(selected.warrantyExpiry).toISOString().split("T")[0] : ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, warrantyExpiry: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Last Maintenance:</label>
+                                                <input
+                                                    type="date"
+                                                    value={selected.lastMaintenance ? new Date(selected.lastMaintenance).toISOString().split("T")[0] : ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, lastMaintenance: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="form-field">
+                                                <label>Next Maintenance:</label>
+                                                <input
+                                                    type="date"
+                                                    value={selected.nextMaintenance ? new Date(selected.nextMaintenance).toISOString().split("T")[0] : ""}
+                                                    onChange={(e) => setSelected(prev => ({ ...prev, nextMaintenance: e.target.value }))}
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+
+                                {/* Actions */}
+                                <div className="modal-actions">
+                                    <button
+                                        onClick={async () => {
+                                            try {
+                                                const { data } = await api.put(`/products/${selected._id}`, selected);
+                                                setEntities(prev => prev.map(p => (p._id === data._id ? data : p)));
+                                                setEditMode(false);
+                                                setModalType(null);
+                                                toast.success("✅ Product updated successfully!");
+                                            } catch (err) {
+                                                alert("Failed to update product: " + (err.response?.data?.message || err.message));
+                                            }
+                                        }}
+                                    >
+                                        Save
+                                    </button>
+                                    <button onClick={() => setEditMode(false)}>Cancel</button>
+                                </div>
+                            </>
+                        )}
                     </div>
                 )}
                 {modalType === "details" && currentView === "DC" && selected && (
@@ -1239,8 +1530,69 @@ export default function Dashboard() {
 
 
                         <div className="modal-actions">
-                            <button>Edit</button>
-                            <button>Assign to Customer</button>
+                            {!assignMode ? (
+                                <button onClick={() => setAssignMode(true)}>Assign to Customer</button>
+                            ) : (
+                                <div className="form-field">
+                                    {/* Select Customer */}
+                                    <select
+                                        value={selectedCustomer}
+                                        onChange={(e) => setSelectedCustomer(e.target.value)}
+                                    >
+                                        <option value="">No customer</option>
+                                        {customers.map((c) => (
+                                            <option key={c._id} value={c._id}>
+                                                {c.companyName}
+                                            </option>
+                                        ))}
+                                    </select>
+
+                                    {/* Input for IP Address */}
+                                    <input
+                                        type="text"
+                                        placeholder="Enter IP Address"
+                                        value={ipAddress}
+                                        onChange={(e) => setIpAddress(e.target.value)}
+                                        style={{ marginTop: "0.5rem" }}
+                                    />
+
+                                    <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem" }}>
+                                        <button
+                                            onClick={async () => {
+                                                try {
+                                                    await api.post("/customers/add-service", {
+                                                        customerId: selectedCustomer,
+                                                        serviceId: selected._id, // notice: use the service you're editing
+                                                        ipAddress: ipAddress || ""
+                                                    });
+
+                                                    // update locally if needed
+                                                    setSelected((prev) => ({
+                                                        ...prev,
+                                                        customerId: selectedCustomer,
+                                                        ipAddress: ipAddress
+                                                    }));
+
+                                                    setAssignMode(false);
+                                                    setSelectedCustomer("");
+                                                    setIpAddress("");
+                                                    setModalType(null);
+                                                    toast.success("✅ Service Assigned successfully!");
+                                                } catch (err) {
+                                                    alert("Failed to assign: " + (err.response?.data?.error || err.message));
+                                                }
+                                            }}
+                                        >
+                                            Save
+                                        </button>
+                                        <button onClick={() => {
+                                            setAssignMode(false);
+                                            setSelectedCustomer("");
+                                            setIpAddress("");
+                                        }}>Cancel</button>
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     </div>
                 )}
@@ -1295,8 +1647,9 @@ export default function Dashboard() {
                         </div>
 
                         {employeeErrors.general && <p className="error-text">{employeeErrors.general}</p>}
-
-                        <button onClick={handleSaveEmployee}>Save</button>
+                        <div className="modal-actions">
+                            <button onClick={handleSaveEmployee}>Save</button>
+                        </div>
                     </div>
                 )}
                 {/* PRODUCT ADD MODAL */}
@@ -1466,8 +1819,9 @@ export default function Dashboard() {
                         </div>
 
                         {productErrors.general && <p className="error-text">{productErrors.general}</p>}
-
-                        <button onClick={handleSaveProduct}>Save</button>
+                        <div className="modal-actions">
+                            <button onClick={handleSaveProduct}>Save</button>
+                        </div>
                     </div>
                 )}
                 {modalType === "dc" && (
@@ -1519,7 +1873,9 @@ export default function Dashboard() {
                         </div>
 
                         {dcErrors.general && <p className="error-text">{dcErrors.general}</p>}
-                        <button onClick={handleSaveDC}>Save</button>
+                        <div className="modal-actions">
+                            <button onClick={handleSaveDC}>Save</button>
+                        </div>
                     </div>
                 )}
                 {/* SERVICE ADD MODAL */}
@@ -1627,6 +1983,7 @@ export default function Dashboard() {
                                         setNewService({ ...newService, associatedProducts: updated });
                                     }}
                                 />
+                                
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -1645,6 +2002,7 @@ export default function Dashboard() {
                                 )}
                             </div>
                         ))}
+                         <div className="modal-actions">
                         <button
                             type="button"
                             onClick={() =>
@@ -1659,7 +2017,7 @@ export default function Dashboard() {
                         >
                             + Add Product
                         </button>
-
+                        </div>
                         {/* Datacenter Location */}
                         <div className="form-field">
                             <input
@@ -1696,14 +2054,15 @@ export default function Dashboard() {
                         {serviceErrors.general && (
                             <p className="error-text">{serviceErrors.general}</p>
                         )}
-
-                        <button onClick={handleSaveService}>Save</button>
+                        <div className="modal-actions">
+                            <button onClick={handleSaveService}>Save</button>
+                        </div>
                     </div>
                 )}
 
                 {/* Later you’ll add Product/DC/Service add modals here */}
             </Modal>
-
+            <ToastContainer position="top-right" autoClose={3000} />
         </div>
     );
 }
