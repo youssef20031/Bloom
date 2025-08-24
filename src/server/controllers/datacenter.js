@@ -67,7 +67,11 @@ export const addIotReading = async (req, res) => {
         message: `Temperature exceeded 30°C (current: ${temperature}°C)`,
         status: 'new'
       });
-      getIo().emit('new-alert', alert);
+      getIo().emit('new-alert', {
+        alert: alert,
+        timestamp: new Date().toISOString(),
+        type: 'new-alert'
+      });
     }
 
     if (humidity > 70) {
@@ -78,7 +82,11 @@ export const addIotReading = async (req, res) => {
         message: `Humidity exceeded 70% (current: ${humidity}%)`,
         status: 'new'
       });
-      getIo().emit('new-alert', alert2);
+      getIo().emit('new-alert', {
+        alert: alert2,
+        timestamp: new Date().toISOString(),
+        type: 'new-alert'
+      });
     }
 
     if (powerDraw > 1000) {
@@ -89,7 +97,11 @@ export const addIotReading = async (req, res) => {
         message: `Power draw exceeded 1000W (current: ${powerDraw}W)`,
         status: 'new'
       });
-      getIo().emit('new-alert', alert3);
+      getIo().emit('new-alert', {
+        alert: alert3,
+        timestamp: new Date().toISOString(),
+        type: 'new-alert'
+      });
     }
     if (smokelevel === 1) {
       const alert4=await Alert.create({
@@ -99,7 +111,11 @@ export const addIotReading = async (req, res) => {
         message: `Smoke level is high`,
         status: 'new'
       });
-      getIo().emit('new-alert', alert4);
+      getIo().emit('new-alert', {
+        alert: alert4,
+        timestamp: new Date().toISOString(),
+        type: 'new-alert'
+      });
     }
 
     res.status(200).send({ message: 'Reading added and alerts checked', datacenter });
