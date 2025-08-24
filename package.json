@@ -23,6 +23,7 @@
     "express": "^5.1.0",
     "lucide-react": "^0.540.0",
     "mongoose": "^8.17.2",
+    "pdfkit": "^0.15.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",
