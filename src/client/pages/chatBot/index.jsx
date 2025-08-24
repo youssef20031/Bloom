@@ -7,6 +7,7 @@ import "./chatBot.css";
 import ChatWindow from './ChatWindow.jsx';
 import ChatInput from './ChatInput.jsx';
 import SessionList from './SessionList.jsx';
+import Modal from './Modal.jsx'; 
 
 export default function ChatBot() {
     const [messages, setMessages] = useState([
@@ -19,8 +20,11 @@ export default function ChatBot() {
     const [sessions, setSessions] = useState([]);
     const [selectedSession, setSelectedSession] = useState(null);
     const user= localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
-    const API_BASE = 'http://localhost:3000/api/chat'; 
+    const API_BASE = '/api/chat';
     const PRESALES_USER_ID = user._id || undefined;
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [sessionToDelete, setSessionToDelete] = useState(null);
+
     useEffect(() => {
         fetchSessions();
     }, []);
@@ -161,12 +165,49 @@ export default function ChatBot() {
         }
     };
 
+    const handleDeleteSession = (sessionId) => {
+        setSessionToDelete(sessionId);
+        setIsModalOpen(true);
+    };
+
+    // --- NEW: Function to close the modal ---
+    const handleCancelDelete = () => {
+        setIsModalOpen(false);
+        setSessionToDelete(null);
+    };
+
+    // --- NEW: Function to run when deletion is confirmed ---
+    const handleConfirmDelete = async () => {
+        if (!sessionToDelete) return;
+
+        try {
+            await axios.delete(`${API_BASE}/sessions/${sessionToDelete}`);
+
+            if (selectedSession?._id === sessionToDelete) {
+                handleNewSession();
+            }
+            fetchSessions();
+        } catch (error) {
+            console.error('Failed to delete session', error);
+            alert('Could not delete the session. Please try again.');
+        } finally {
+            // Close the modal and reset the state
+            setIsModalOpen(false);
+            setSessionToDelete(null);
+        }
+    };
+
     return (
         <div className="chatbot-wrapper">
             <div className="app-container">
                 <div className="sidebar">
-                    <button onClick={handleNewSession}>+ New Session</button>
-                    <SessionList sessions={sessions} selectedSessionId={selectedSession?._id} onSelect={handleSelectSession} />
+                    <button className="session-button" onClick={handleNewSession}>+ New Session</button>
+                    <SessionList 
+                        sessions={sessions} 
+                        selectedSessionId={selectedSession?._id} 
+                        onSelect={handleSelectSession} 
+                        onDelete={handleDeleteSession}
+                    />
                 </div>
                 
                 <main className="main-content-area">
@@ -174,7 +215,6 @@ export default function ChatBot() {
                     <div className={`content ${showReport ? 'hidden' : ''}`}>
                         <header className="app-header">
                             <h1>Dell Presales Technical Assistant</h1>
-                            {/* --- EDIT: Added fallback for status --- */}
                             {selectedSession && <div className={`badge status-${selectedSession.status || 'active'}`}>{selectedSession.status || 'active'}</div>}
                         </header>
                         <ChatWindow messages={messages} isLoading={isLoading} />
@@ -193,6 +233,14 @@ export default function ChatBot() {
                     </div>
                 </main>
             </div>
+            <Modal
+                isOpen={isModalOpen}
+                onClose={handleCancelDelete}
+                onConfirm={handleConfirmDelete}
+                title="Delete Session"
+            >
+                <p>Are you sure you want to permanently delete this session? This action cannot be undone.</p>
+            </Modal>
         </div>
     );
 }

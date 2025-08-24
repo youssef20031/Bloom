@@ -13,7 +13,7 @@ class SocketService {
     }
 
     // Connect to backend WebSocket
-    this.socket = io("http://localhost:3000", {
+    this.socket = io("/", {
       transports: ["websocket"], // Force WebSocket
       forceNew: true,
     });
@@ -96,4 +96,3 @@ class SocketService {
 const socketService = new SocketService();
 
 export default socketService;
-

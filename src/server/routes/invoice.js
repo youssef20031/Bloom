@@ -5,12 +5,16 @@ import {
     createInvoice,
     updateInvoice,
     deleteInvoice,
+    getInvoicePdf,
 } from '../controllers/invoice.js';
 
 const router = express.Router();
 
 // GET all invoices
 router.get('/', getAllInvoices);
+
+// GET invoice PDF (placed before generic :id route)
+router.get('/:id/pdf', getInvoicePdf);
 
 // GET a single invoice by ID
 router.get('/:id', getInvoiceById);
@@ -25,4 +29,3 @@ router.put('/:id', updateInvoice);
 router.delete('/:id', deleteInvoice);
 
 export default router;
-
