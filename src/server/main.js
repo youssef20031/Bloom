@@ -15,6 +15,7 @@ import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
 import cors from "cors";
 import chatRoutes from "./routes/chatBot.js";
+import requestChangeRoutes from './routes/requestChange.js';
 
 
 dotenv.config();
@@ -49,7 +50,6 @@ mongoose.connect(MONGO_URI, {
   serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
   socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
   maxPoolSize: 10, // Maintain up to 10 socket connections
-  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
   heartbeatFrequencyMS: 10000, // Increase heartbeat frequency to 10 seconds
 })
   .then(() => {
@@ -107,6 +107,7 @@ app.use('/api/support-ticket', supportTicketRoutes);
 
 
 app.use('/api/chat', chatRoutes);
+app.use('/api/request-change', requestChangeRoutes);
 
 
 // Error handling middleware
