@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./adminview.css";
 import BloomLogo from "../../assets/Bloom_Logo.svg";
-const api = axios.create({ baseURL: "http://localhost:3000/api" });
+const api = axios.create({ baseURL: "/api" });
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from "react-toastify";
