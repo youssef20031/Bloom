@@ -2,6 +2,79 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './it.style.css';
 import { LayoutDashboard, AlertTriangle, Server, Wrench, Users, Bell, Plus, Search, Download, Calendar, Activity as ActivityIcon, Thermometer, Droplet, Zap, Cloud, Shield, Wifi, WifiOff, CheckCircle2, X, Eye, Clock, AlertCircle, Flame } from 'lucide-react';
 import socketService from '../../utils/socket.js';
+import mqtt from "mqtt";
+
+// ====== 🔧 MQTT Configuration for Live Sensors ======
+const BROKER_URL = "wss://c2e0fd901fdb464e8b397971387b99f7.s1.eu.hivemq.cloud:8884/mqtt";
+const USERNAME = "seiff";
+const PASSWORD = "Seif1234";
+const TOPIC = "ESP32/sensors";
+const TOPIC2 = "ESP32/sensors2";
+const STALE_AFTER_MS = 5000;
+
+// Connection timeout settings
+const CONNECTION_TIMEOUT = 10000; // 10 seconds
+
+// Sensor thresholds for automatic alerts
+const SENSOR_THRESHOLDS = {
+	temperature: { min: 18, max: 30, critical: 35 }, // Celsius
+	humidity: { min: 30, max: 70, critical: 80 }, // Percentage
+	smoke: { max: 300, critical: 500 }, // Sensor units
+	power: { min: 3.0, max: 5.2, critical: 5.5 } // Volts
+};
+
+// Helper function to coerce numbers that might arrive as strings
+const toNum = (v) => (v === null || v === undefined || v === "" ? null : Number(v));
+
+// Utility Components with validation
+const StatusBadge = ({ status = '', type = 'status' }) => {
+	// Validate inputs
+	if (!status || typeof status !== 'string') {
+		console.warn('StatusBadge: status prop is required and must be a string');
+		return <span className="badge badge-gray">N/A</span>;
+	}
+
+	const getClass = () => {
+		if (type === 'priority') {
+			switch (status.toLowerCase()) {
+				case 'high': return 'badge-red';
+				case 'medium': return 'badge-yellow';
+				case 'low': return 'badge-green';
+				default: return 'badge-gray';
+			}
+		}
+		switch (status.toLowerCase()) {
+			case 'open': return 'badge-gray';
+			case 'in_progress': return 'badge-orange';
+			case 'closed': case 'resolved': return 'badge-green';
+			default: return 'badge-gray';
+		}
+	};
+	
+	return <span className={`badge ${getClass()}`}>{status}</span>;
+};
+
+const ConnectionIndicator = ({ isConnected = false, label = '', icon: Icon = null }) => {
+	// Validate inputs
+	if (!Icon || typeof Icon !== 'function') {
+		console.warn('ConnectionIndicator: icon prop is required and must be a valid component');
+		return null;
+	}
+	
+	if (!label || typeof label !== 'string') {
+		console.warn('ConnectionIndicator: label prop is required and must be a string');
+		return null;
+	}
+
+	return (
+		<div className="flex items-center space-x-2">
+			<div className={`flex items-center ${isConnected ? 'text-green-600' : 'text-red-600'} text-sm`}>
+				<Icon className="w-4 h-4 mr-1" />
+				<span className="hidden md:inline">{label}</span>
+			</div>
+		</div>
+	);
+};
 
 export default function ITDashboard() {
 	const [activeTab, setActiveTab] = useState('Incidents');
@@ -14,56 +87,380 @@ export default function ITDashboard() {
 	const [healthOverview, setHealthOverview] = useState(null);
 	const [isConnected, setIsConnected] = useState(false);
 	const [realtimeAlerts, setRealtimeAlerts] = useState([]);
+	const [isLoading, setIsLoading] = useState(true);
+	const [loadingStates, setLoadingStates] = useState({
+		incidents: true,
+		assets: true,
+		services: true,
+		health: true,
+		users: true,
+		alerts: true
+	});
+	const [errors, setErrors] = useState({});
+	const [recentAlertHistory, setRecentAlertHistory] = useState(new Set()); // Track recent alerts to prevent spam
 	const alertSound = useRef(null);
-	// Prepare dynamic health metrics array
+	
+	// IoT Dashboard States (from test.jsx)
+	const [iotReadings, setIotReadings] = useState({
+		esp1: null,
+		esp2: null,
+	});
+	const [iotAverages, setIotAverages] = useState({
+		temperature: 0,
+		humidity: 0,
+		smoke: 0,
+		power: 0,
+	});
+	
+	// MQTT Live Sensor States
+	const mqttClientRef = useRef(null);
+	const [mqttStatus, setMqttStatus] = useState("Connecting…");
+	const [lastSensorUpdate, setLastSensorUpdate] = useState(null);
+	const [mqttError, setMqttError] = useState("");
+	const [liveSensors, setLiveSensors] = useState({
+		temperature: null,
+		humidity: null,
+		proximity: null,
+		smoke1: null,
+		smoke2: null,
+	});
+	
+	// Check if sensor data is stale
+	const isSensorDataStale = useMemo(() => {
+		if (!lastSensorUpdate) return true;
+		return Date.now() - lastSensorUpdate > STALE_AFTER_MS;
+	}, [lastSensorUpdate]);
+
+	// Function to check sensor values against thresholds and generate alerts
+	const checkSensorThresholds = (sensorData, nodeId) => {
+		const alerts = [];
+		const timestamp = new Date().toISOString();
+		
+		Object.entries(sensorData).forEach(([sensor, value]) => {
+			if (value === null || isNaN(value)) return;
+			
+			const thresholds = SENSOR_THRESHOLDS[sensor];
+			if (!thresholds) return;
+			
+			// Create unique alert key to prevent spam
+			const alertKey = `${nodeId}-${sensor}-${Date.now()}`;
+			
+			// Skip if we've already alerted for this sensor recently (within 30 seconds)
+			const recentAlertKey = `${nodeId}-${sensor}`;
+			const now = Date.now();
+			const lastAlertTime = localStorage.getItem(`lastAlert-${recentAlertKey}`);
+			if (lastAlertTime && (now - parseInt(lastAlertTime)) < 30000) {
+				return; // Skip to prevent alert spam
+			}
+			
+			let alertData = null;
+			
+			// Check critical thresholds first
+			if (thresholds.critical && value >= thresholds.critical) {
+				alertData = {
+					_id: alertKey,
+					type: sensor,
+					severity: 'critical',
+					status: 'new',
+					read: false,
+					message: `Critical ${sensor} level detected on ${nodeId}: ${value}${getUnitForSensor(sensor)} (Critical: ≥${thresholds.critical})`,
+					source: nodeId,
+					value: value,
+					threshold: thresholds.critical,
+					timestamp: timestamp,
+					createdAt: timestamp
+				};
+			}
+			// Check high thresholds
+			else if (thresholds.max && value > thresholds.max) {
+				alertData = {
+					_id: alertKey,
+					type: sensor,
+					severity: 'warning',
+					status: 'new',
+					read: false,
+					message: `High ${sensor} detected on ${nodeId}: ${value}${getUnitForSensor(sensor)} (Max: ${thresholds.max})`,
+					source: nodeId,
+					value: value,
+					threshold: thresholds.max,
+					timestamp: timestamp,
+					createdAt: timestamp
+				};
+			}
+			// Check low thresholds
+			else if (thresholds.min && value < thresholds.min) {
+				alertData = {
+					_id: alertKey,
+					type: sensor,
+					severity: 'warning',
+					status: 'new',
+					read: false,
+					message: `Low ${sensor} detected on ${nodeId}: ${value}${getUnitForSensor(sensor)} (Min: ${thresholds.min})`,
+					source: nodeId,
+					value: value,
+					threshold: thresholds.min,
+					timestamp: timestamp,
+					createdAt: timestamp
+				};
+			}
+			
+			if (alertData) {
+				alerts.push(alertData);
+				// Store the alert time to prevent spam
+				localStorage.setItem(`lastAlert-${recentAlertKey}`, now.toString());
+			}
+		});
+		
+		return alerts;
+	};
+
+	// Helper function to get unit for sensor type
+	const getUnitForSensor = (sensor) => {
+		switch (sensor) {
+			case 'temperature': return '°C';
+			case 'humidity': return '%';
+			case 'power': return 'V';
+			case 'smoke': return '';
+			default: return '';
+		}
+	};
+	// Prepare dynamic health metrics array (excluding sensor averages as they're shown in IoT section)
 	const healthMetrics = useMemo(() => {
 		if (!healthOverview) return [];
 		return [
-			{ title: 'Total Assets', value: healthOverview.totalAssets },
-			{ title: 'Avg Temperature', value: healthOverview.averages.temperature },
-			{ title: 'Avg Humidity', value: healthOverview.averages.humidity },
-			{ title: 'Avg Power Draw', value: healthOverview.averages.powerDraw }
+			{ title: 'Total Assets', value: healthOverview.totalAssets }
 		];
 	}, [healthOverview]);
-	// Prepare KPI cards dynamically
+	// Prepare KPI cards dynamically with null safety
 	const kpiMetrics = useMemo(() => {
 		const base = [
-			{ icon: AlertTriangle, title: 'Open Incidents', value: incidents.filter(i => i.status === 'open').length },
-			{ icon: Bell, title: 'Active Alerts', value: alerts.length },
-			{ icon: Wrench, title: 'Change Requests', value: changes.length },
-			{ icon: Server, title: 'Assets Inventory', value: assets.length },
-			{ icon: LayoutDashboard, title: 'Servers', value: servers.length },
-			{ icon: Users, title: 'Users', value: users.length }
+			{ icon: AlertTriangle, title: 'Open Incidents', value: Array.isArray(incidents) ? incidents.filter(i => i?.status === 'open').length : 0 },
+			{ icon: Wrench, title: 'Change Requests', value: Array.isArray(changes) ? changes.length : 0 },
+			{ icon: Users, title: 'Users', value: Array.isArray(users) ? users.length : 0 }
 		];
-		if (healthOverview) {
-			if (healthOverview.averages.temperature != null) {
-				base.push({ icon: Thermometer, title: 'Avg Temp', value: `${healthOverview.averages.temperature}°C` });
-			}
-			if (healthOverview.averages.humidity != null) {
-				base.push({ icon: Droplet, title: 'Avg Humidity', value: `${healthOverview.averages.humidity}%` });
-			}
-			if (healthOverview.averages.powerDraw != null) {
-				base.push({ icon: Zap, title: 'Avg Power', value: `${healthOverview.averages.powerDraw}W` });
-			}
+		
+		// Add live sensor status indicator if available
+		if (liveSensors.temperature !== null && !isNaN(liveSensors.temperature) && !isSensorDataStale) {
+			base.push({ 
+				icon: Thermometer, 
+				title: 'Live Sensors', 
+				value: 'Active',
+				isLive: true,
+				status: mqttStatus
+			});
 		}
+		
 		return base;
-	}, [incidents, alerts, changes, assets, servers, users, healthOverview]);
-	const priorityToClass = (priority) => {
-		switch (priority) {
-			case 'high': return 'badge-red';
-			case 'medium': return 'badge-yellow';
-			case 'low': return 'badge-green';
-			default: return 'badge-gray';
+	}, [incidents, alerts, changes, assets, servers, users, healthOverview, liveSensors, isSensorDataStale, mqttStatus]);
+
+	// MQTT Connection for Live Sensors
+	useEffect(() => {
+		// Connection timeout handling
+		const connectionTimer = setTimeout(() => {
+			if (mqttStatus === "Connecting…") {
+				setMqttStatus("Connection Timeout ⏰");
+				setMqttError("Failed to connect to MQTT broker within timeout period");
+			}
+		}, CONNECTION_TIMEOUT);
+		
+		// Create MQTT client for live sensor data
+		const mqttClient = mqtt.connect(BROKER_URL, {
+			username: USERNAME,
+			password: PASSWORD,
+			clientId: "it_dashboard_" + Math.random().toString(16).slice(2, 10),
+			keepalive: 60,
+			reconnectPeriod: 2000,
+			connectTimeout: CONNECTION_TIMEOUT,
+			clean: true,
+			protocolVersion: 4, // Use MQTT 3.1.1
+		});
+		
+		mqttClientRef.current = mqttClient;
+		
+		mqttClient.on("connect", () => {
+			setMqttStatus("Connected ✅");
+			setMqttError("");
+			clearTimeout(connectionTimer);
+			console.log("🌡️ Connected to MQTT broker for live sensors");
+					mqttClient.subscribe(TOPIC, (err) => {
+			if (err) {
+				setMqttError("Subscribe error: " + err.message);
+				console.error("MQTT subscribe error:", err);
+			} else {
+				console.log(`✅ Successfully subscribed to ${TOPIC}`);
+			}
+		});
+		mqttClient.subscribe(TOPIC2, (err) => {
+			if (err) {
+				setMqttError("ESP2 Subscribe error: " + err.message);
+				console.error("ESP2 MQTT subscribe error:", err);
+			} else {
+				console.log(`✅ Successfully subscribed to ${TOPIC2}`);
+			}
+		});
+		});
+		
+		mqttClient.on("reconnect", () => setMqttStatus("Reconnecting…"));
+		mqttClient.on("offline", () => setMqttStatus("Offline ❌"));
+		mqttClient.on("close", () => setMqttStatus("Closed"));
+		mqttClient.on("error", (err) => {
+			const errorMessage = err?.message || String(err);
+			setMqttError(errorMessage);
+			setMqttStatus("Connection Error ❌");
+			setErrors(prev => ({ ...prev, mqtt: `MQTT connection failed: ${errorMessage}` }));
+			console.error("MQTT error:", err);
+		});
+		
+		mqttClient.on("message", (topic, payload) => {
+			try {
+				const raw = payload.toString("utf8");
+				const clean = raw.replace(/\u00A0/g, " ").trim();
+				const sensorData = JSON.parse(clean);
+				
+				// Handle ESP32/sensors topic (ESP1 data)
+				if (topic === TOPIC) {
+					const processedData = {
+						temperature: toNum(sensorData.temperature),
+						humidity: toNum(sensorData.humidity),
+						proximity: toNum(sensorData.proximity),
+						smoke1: toNum(sensorData.smoke1),
+						smoke2: toNum(sensorData.smoke2),
+					};
+
+					setLiveSensors(processedData);
+					setLastSensorUpdate(Date.now());
+					
+					// Map to ESP1 format for IoT dashboard
+					const esp1Data = {
+						temperature: processedData.temperature,
+						humidity: processedData.humidity,
+						smoke: processedData.smoke1,
+						power: processedData.proximity,
+					};
+
+					setIotReadings((prev) => ({
+						...prev,
+						esp1: esp1Data
+					}));
+
+					// Check thresholds and generate alerts
+					const generatedAlerts = checkSensorThresholds(esp1Data, 'ESP-01');
+					if (generatedAlerts.length > 0) {
+						generatedAlerts.forEach(alert => {
+							// Add to realtime alerts
+							setRealtimeAlerts(prev => [alert, ...prev.slice(0, 9)]);
+							setAlerts(prev => [alert, ...prev]);
+							
+							// Emit via WebSocket if connected
+							if (isConnected) {
+								socketService.sendTestEvent({
+									type: 'sensor_alert',
+									alert: alert,
+									timestamp: new Date().toISOString()
+								});
+							}
+							
+							// Play alert sound
+							if (alertSound.current) {
+								alertSound.current.play().catch(e => console.log('Could not play alert sound'));
+							}
+							
+							console.log('🚨 Auto-generated sensor alert:', alert);
+						});
+					}
+					
+					console.log("📊 ESP1 sensor data updated:", sensorData);
+				}
+				
+				// Handle ESP32/sensors2 topic (ESP2 data)
+				if (topic === TOPIC2) {
+					// Map to ESP2 format for IoT dashboard
+					const esp2Data = {
+						temperature: toNum(sensorData.temperature),
+						humidity: toNum(sensorData.humidity),
+						smoke: toNum(sensorData.smoke1 || sensorData.smoke),
+						power: toNum(sensorData.proximity || sensorData.power),
+					};
+
+					setIotReadings((prev) => ({
+						...prev,
+						esp2: esp2Data
+					}));
+
+					// Check thresholds and generate alerts for ESP2
+					const generatedAlerts = checkSensorThresholds(esp2Data, 'ESP-02');
+					if (generatedAlerts.length > 0) {
+						generatedAlerts.forEach(alert => {
+							// Add to realtime alerts
+							setRealtimeAlerts(prev => [alert, ...prev.slice(0, 9)]);
+							setAlerts(prev => [alert, ...prev]);
+							
+							// Emit via WebSocket if connected
+							if (isConnected) {
+								socketService.sendTestEvent({
+									type: 'sensor_alert',
+									alert: alert,
+									timestamp: new Date().toISOString()
+								});
+							}
+							
+							// Play alert sound
+							if (alertSound.current) {
+								alertSound.current.play().catch(e => console.log('Could not play alert sound'));
+							}
+							
+							console.log('🚨 Auto-generated ESP2 sensor alert:', alert);
+						});
+					}
+
+					console.log("📊 ESP2 sensor data updated:", sensorData);
+				}
+			} catch (e) {
+				setMqttError("Parse error: " + (e?.message || e));
+				console.error("MQTT message parse error:", e);
+			}
+		});
+		
+		return () => {
+			clearTimeout(connectionTimer);
+			try {
+				mqttClient.end(true);
+			} catch {}
+		};
+	}, []);
+	
+	// Calculate IoT averages whenever iotReadings change
+	useEffect(() => {
+		if (iotReadings.esp1 && iotReadings.esp2) {
+			setIotAverages({
+				temperature: (
+					(iotReadings.esp1.temperature + iotReadings.esp2.temperature) /
+					2
+				).toFixed(1),
+				humidity: (
+					(iotReadings.esp1.humidity + iotReadings.esp2.humidity) /
+					2
+				).toFixed(1),
+				smoke: (
+					(iotReadings.esp1.smoke + iotReadings.esp2.smoke) /
+					2
+				).toFixed(1),
+				power: (
+					(iotReadings.esp1.power + iotReadings.esp2.power) /
+					2
+				).toFixed(1),
+			});
+		} else if (iotReadings.esp1) {
+			// If only ESP1 data is available, use it as the "average"
+			setIotAverages({
+				temperature: Number(iotReadings.esp1.temperature).toFixed(1),
+				humidity: Number(iotReadings.esp1.humidity).toFixed(1),
+				smoke: Number(iotReadings.esp1.smoke).toFixed(1),
+				power: Number(iotReadings.esp1.power).toFixed(1),
+			});
 		}
-	};
-	const statusToClass = (status) => {
-		switch (status) {
-			case 'open': return 'badge-gray';
-			case 'in_progress': return 'badge-orange';
-			case 'closed': return 'badge-green';
-			default: return 'badge-gray';
-		}
-	};
+	}, [iotReadings]);
+	
 	// WebSocket connection and real-time functionality
 	useEffect(() => {
 		// Connect to WebSocket
@@ -134,43 +531,58 @@ export default function ITDashboard() {
 		
 		// Cleanup function
 		return () => {
-			socketService.removeAllListeners();
 			socketService.disconnect();
 		};
 	}, []);
 
+	// Data fetching configuration
+	const dataEndpoints = useMemo(() => [
+		{ url: '/api/support-ticket', setter: setIncidents, label: 'support tickets', key: 'incidents' },
+		{ 
+			url: '/api/datacenter', 
+			setter: (data) => {
+				setAssets(data);
+				setServers(data.filter(item => item.assetType === 'server'));
+			}, 
+			label: 'datacenter assets', 
+			key: 'assets' 
+		},
+		{ url: '/api/service', setter: setChanges, label: 'services', key: 'services' },
+		{ url: '/api/datacenter/health/overview', setter: setHealthOverview, label: 'health overview', key: 'health' },
+		{ url: '/api/users', setter: setUsers, label: 'users', key: 'users' },
+		{ url: '/api/alerts', setter: setAlerts, label: 'alerts', key: 'alerts' }
+	], []);
+
 	// Fetch initial data
 	useEffect(() => {
-		fetch('/api/support-ticket')
-			.then(res => res.json())
-			.then(data => setIncidents(data))
-			.catch(err => console.error(err));
-		fetch('/api/datacenter')
-			.then(res => res.json())
-			.then(data => {
-				setAssets(data);
-				// Populate servers from datacenter assets
-				setServers(data.filter(item => item.assetType === 'server'));
-			})
-			.catch(err => console.error(err));
-		// Fetch change requests (services) as change items
-		fetch('/api/service')
-			.then(res => res.json())
-			.then(data => setChanges(data))
-			.catch(err => console.error(err));
-		fetch('/api/datacenter/health/overview')
-			.then(res => res.json())
-			.then(data => setHealthOverview(data))
-			.catch(err => console.error(err));
-		fetch('/api/users')
-			.then(res => res.json())
-			.then(data => setUsers(data))
-			.catch(err => console.error(err));
-		fetch('/api/alerts')
-			.then(res => res.json())
-			.then(data => setAlerts(data))
-			.catch(err => console.error(err));
-	}, []);
+		const fetchWithErrorHandling = async ({ url, setter, label, key }) => {
+			try {
+				setLoadingStates(prev => ({ ...prev, [key]: true }));
+				setErrors(prev => ({ ...prev, [key]: null }));
+				
+				const response = await fetch(url);
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+				}
+				const data = await response.json();
+				setter(data);
+				console.log(`✅ Successfully loaded ${label}:`, data.length || 'N/A');
+			} catch (error) {
+				console.error(`❌ Failed to load ${label} from ${url}:`, error);
+				setErrors(prev => ({ ...prev, [key]: error.message }));
+				setter([]);
+			} finally {
+				setLoadingStates(prev => ({ ...prev, [key]: false }));
+			}
+		};
+
+		const loadData = async () => {
+			await Promise.all(dataEndpoints.map(fetchWithErrorHandling));
+			setIsLoading(false);
+		};
+		
+		loadData();
+	}, [dataEndpoints]);
 	// Search term state
 	const [searchTerm, setSearchTerm] = useState('');
 	// Filtered data based on search term
@@ -235,136 +647,146 @@ export default function ITDashboard() {
 		const start = (currentPage - 1) * rowsPerPage;
 		return currentData.slice(start, start + rowsPerPage);
 	}, [currentData, currentPage, rowsPerPage]);
-	// Export current table data as CSV
+	// Export current table data as CSV with error handling
 	const exportCSV = () => {
-		let headers = [], rows = [];
-		if (activeTab === 'Incidents') {
-			headers = ['Ticket ID','Issue','Priority','Status','Assignee','Updated'];
-			rows = filteredIncidents.map(r => [
-				r._id,
-				r.issue,
-				r.priority,
-				r.status,
-				r.supportAgentId?.name || '',
-				new Date(r.history?.length ? r.history[r.history.length-1].timestamp : r.createdAt).toLocaleString()
-			]);
-		} else if (activeTab === 'Assets') {
-			headers = ['Asset ID','Type','Location'];
-			rows = filteredAssets.map(a => [
-				a.assetId?.name || '',
-				a.assetType,
-				a.location
-			]);
-		} else if (activeTab === 'Servers') {
-			headers = ['Server Name','Location','Temperature','PowerDraw','Last Reading'];
-			rows = filteredServers.map(s => {
-				const lr = s.latestReading || {};
-				return [
-					s.assetId?.name || '',
-					s.location,
-					lr.temperature ?? '',
-					lr.powerDraw ?? '',
-					lr.timestamp ? new Date(lr.timestamp).toLocaleString() : ''
-				];
-			});
-		} else if (activeTab === 'Changes') {
-			headers = ['Service Name','Type','Created','Updated'];
-			rows = filteredChanges.map(c => [
-				c.name,
-				c.type,
-				new Date(c.createdAt).toLocaleString(),
-				new Date(c.updatedAt).toLocaleString()
-			]);
-		} else if (activeTab === 'Users') {
-			headers = ['Name','Email','Role','Created'];
-			rows = filteredUsers.map(u => [
-				u.name,
-				u.email,
-				u.role,
-				new Date(u.createdAt).toLocaleString()
-			]);
-		}
-		const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-		const link = document.createElement('a');
-		link.setAttribute('href', encodeURI(csvContent));
-		link.setAttribute('download', `${activeTab}.csv`);
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
-	};
-
-	// Helper functions for alerts
-	const createTestAlert = async () => {
 		try {
-			console.log('🧪 Creating test alert...');
-			const response = await fetch('/api/alerts/test', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
+			let headers = [], rows = [];
+			
+			const dataMap = {
+				'Incidents': {
+					headers: ['Ticket ID','Issue','Priority','Status','Assignee','Updated'],
+					data: filteredIncidents,
+					mapper: (r) => [
+						r._id || 'N/A',
+						r.issue || 'N/A',
+						r.priority || 'N/A',
+						r.status || 'N/A',
+						r.supportAgentId?.name || 'Unassigned',
+						r.history?.length ? new Date(r.history[r.history.length-1].timestamp).toLocaleString() : new Date(r.createdAt).toLocaleString()
+					]
 				},
-			});
-			if (response.ok) {
-				const result = await response.json();
-				console.log('✅ Test alert created successfully:', result);
-			} else {
-				console.error('❌ Failed to create test alert:', response.status, response.statusText);
+				'Assets': {
+					headers: ['Asset ID','Type','Location'],
+					data: filteredAssets,
+					mapper: (a) => [
+						a.assetId?.name || a.id || 'N/A',
+						a.assetType || a.type || 'N/A',
+						a.location || 'N/A'
+					]
+				},
+				'Servers': {
+					headers: ['Server Name','Location','Temperature','PowerDraw','Last Reading'],
+					data: filteredServers,
+					mapper: (s) => {
+						const lr = s.latestReading || {};
+						return [
+							s.assetId?.name || s._id || 'N/A',
+							s.location || 'N/A',
+							lr.temperature ?? 'N/A',
+							lr.powerDraw ?? 'N/A',
+							lr.timestamp ? new Date(lr.timestamp).toLocaleString() : 'N/A'
+						];
+					}
+				},
+				'Changes': {
+					headers: ['Service Name','Type','Created','Updated'],
+					data: filteredChanges,
+					mapper: (c) => [
+						c.name || 'N/A',
+						c.type || 'N/A',
+						c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A',
+						c.updatedAt ? new Date(c.updatedAt).toLocaleString() : 'N/A'
+					]
+				},
+				'Users': {
+					headers: ['Name','Email','Role','Created'],
+					data: filteredUsers,
+					mapper: (u) => [
+						u.name || 'N/A',
+						u.email || 'N/A',
+						u.role || 'N/A',
+						u.createdAt ? new Date(u.createdAt).toLocaleString() : 'N/A'
+					]
+				}
+			};
+
+			const config = dataMap[activeTab];
+			if (!config) {
+				throw new Error(`Export not supported for tab: ${activeTab}`);
 			}
-		} catch (error) {
-			console.error('❌ Error creating test alert:', error);
-		}
-	};
 
-	const createRandomTestAlert = async () => {
-		try {
-			console.log('🎲 Creating random test alert...');
-			const response = await fetch('/api/alerts/test/random', {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-			});
-			if (response.ok) {
-				const result = await response.json();
-				console.log('✅ Random test alert created successfully:', result);
-			} else {
-				console.error('❌ Failed to create random test alert:', response.status, response.statusText);
+			headers = config.headers;
+			rows = config.data.map(config.mapper);
+
+			if (rows.length === 0) {
+				throw new Error('No data available to export');
 			}
+
+			// Properly escape CSV values
+			const escapeCsvValue = (value) => {
+				const str = String(value);
+				if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+					return `"${str.replace(/"/g, '""')}"`;
+				}
+				return str;
+			};
+
+			const csvContent = 'data:text/csv;charset=utf-8,' + [
+				headers.map(escapeCsvValue).join(','),
+				...rows.map(row => row.map(escapeCsvValue).join(','))
+			].join('\n');
+			
+			const link = document.createElement('a');
+			link.setAttribute('href', encodeURI(csvContent));
+			link.setAttribute('download', `${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+
+			console.log(`✅ Successfully exported ${rows.length} rows for ${activeTab}`);
 		} catch (error) {
-			console.error('❌ Error creating random test alert:', error);
+			console.error('❌ Error exporting CSV:', error);
+			setErrors(prev => ({ ...prev, export: `Failed to export CSV: ${error.message}` }));
 		}
 	};
 
-	const markAlertAsRead = async (alertId) => {
-		try {
-			const response = await fetch(`/api/alerts/${alertId}/read`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-			});
-			if (response.ok) {
+	// Alert management actions (manual alert creation removed)
+	const alertActions = {
+		markAsRead: async (alertId) => {
+			try {
+				const response = await fetch(`/api/alerts/${alertId}/read`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+				});
+				
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+				}
+				
 				console.log('✅ Alert marked as read');
-				// Also emit via WebSocket
 				socketService.markAlertAsRead(alertId);
+			} catch (error) {
+				console.error('❌ Error marking alert as read:', error);
+				setErrors(prev => ({ ...prev, alertActions: `Failed to mark alert as read: ${error.message}` }));
 			}
-		} catch (error) {
-			console.error('❌ Error marking alert as read:', error);
-		}
-	};
+		},
 
-	const resolveAlert = async (alertId) => {
-		try {
-			const response = await fetch(`/api/alerts/${alertId}/resolve`, {
-				method: 'PATCH',
-				headers: {
-					'Content-Type': 'application/json',
-				},
-			});
-			if (response.ok) {
+		resolve: async (alertId) => {
+			try {
+				const response = await fetch(`/api/alerts/${alertId}/resolve`, {
+					method: 'PATCH',
+					headers: { 'Content-Type': 'application/json' },
+				});
+				
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+				}
+				
 				console.log('✅ Alert resolved');
+			} catch (error) {
+				console.error('❌ Error resolving alert:', error);
+				setErrors(prev => ({ ...prev, alertActions: `Failed to resolve alert: ${error.message}` }));
 			}
-		} catch (error) {
-			console.error('❌ Error resolving alert:', error);
 		}
 	};
 	return (
@@ -377,7 +799,8 @@ export default function ITDashboard() {
 						{ icon: AlertTriangle, label: 'Incidents', id: 'Incidents' },
 						{ icon: Server, label: 'Assets', id: 'Assets' },
 						{ icon: Wrench, label: 'Changes', id: 'Changes' },
-						{ icon: Users, label: 'Users', id: 'Users' }
+						{ icon: Users, label: 'Users', id: 'Users' },
+						{ icon: Wifi, label: 'IoT Sensors', id: 'IoT' }
 					].map(({ icon: Icon, label, id }) => (
 						<button
 							key={id}
@@ -391,7 +814,6 @@ export default function ITDashboard() {
 					))}
 				</nav>
 			</aside>
-
 			{/* Main Content */}
 			<main className="flex-1 p-8 overflow-y-auto bg-gray-50">
 				<header className="mb-8">
@@ -419,39 +841,27 @@ export default function ITDashboard() {
 								/>
 							</div>
 							
-							{/* WebSocket Connection Status */}
-							<div className="flex items-center space-x-2">
-								{isConnected ? (
-									<div className="flex items-center text-green-600 text-sm">
-										<Wifi className="w-4 h-4 mr-1" />
-										<span className="hidden md:inline">Live</span>
-									</div>
-								) : (
-									<div className="flex items-center text-red-600 text-sm">
-										<WifiOff className="w-4 h-4 mr-1" />
-										<span className="hidden md:inline">Offline</span>
-									</div>
-								)}
+							{/* Connection Status */}
+							<div className="flex items-center space-x-4">
+								<ConnectionIndicator 
+									isConnected={isConnected} 
+									label={isConnected ? "WS" : "WS Off"} 
+									icon={isConnected ? Wifi : WifiOff} 
+								/>
+								<ConnectionIndicator 
+									isConnected={mqttStatus.includes("Connected")} 
+									label={mqttStatus.includes("Connected") ? "Sensors" : "No Sensors"} 
+									icon={Thermometer} 
+								/>
 							</div>
 
-							{/* Test Alert Buttons */}
-							<button 
-								className="btn-quiet text-sm"
-								onClick={createTestAlert}
-								title="Create Test Alert"
-							>
-								<AlertTriangle className="w-4 h-4 mr-1" />
-								Test Alert
-							</button>
-							
-							<button 
-								className="btn-quiet text-sm"
-								onClick={createRandomTestAlert}
-								title="Create Random Test Alert"
-							>
-								<ActivityIcon className="w-4 h-4 mr-1" />
-								Random Alert
-							</button>
+							{/* Sensor Alert Status */}
+							<div className="flex items-center space-x-2 text-sm">
+								<div className="flex items-center">
+									<div className={`w-2 h-2 rounded-full mr-2 ${(iotReadings.esp1 || iotReadings.esp2) ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
+									<span className="text-gray-600">Auto Alerts</span>
+								</div>
+							</div>
 							
 							<button className="btn-primary"><Plus className="w-4 h-4 mr-2" /> New Incident</button>
 							
@@ -472,17 +882,59 @@ export default function ITDashboard() {
 
 				{/* KPI Cards */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-					{kpiMetrics.map(({ icon: Icon, title, value }, idx) => (
-						<div className={`stat-card kpi kpi-${idx + 1}`} key={title}>
-							<div className="kpi-icon"><Icon className="w-5 h-5" /></div>
+					{kpiMetrics.map(({ icon: Icon, title, value, isLive, status }, idx) => (
+						<div className={`stat-card kpi kpi-${idx + 1} ${isLive ? 'live-sensor' : ''}`} key={title}>
+							<div className="kpi-icon">
+								<Icon className="w-5 h-5" />
+								{isLive && (
+									<span className={`ml-2 w-2 h-2 rounded-full ${
+										status?.includes("Connected") ? 'bg-green-500 animate-pulse' : 'bg-red-500'
+									}`}></span>
+								)}
+							</div>
 							<div>
-								<h3 className="text-gray-600">{title}</h3>
-								<p className="text-3xl font-bold">{value}</p>
+								<h3 className="text-gray-600">
+									{title}
+									{isLive && (
+										<span className="ml-1 text-xs text-green-600 font-medium">LIVE</span>
+									)}
+								</h3>
+								<p className={`text-3xl font-bold ${isLive && isSensorDataStale ? 'text-gray-400' : ''}`}>
+									{isLive && isSensorDataStale ? '—' : value}
+								</p>
+								{isLive && lastSensorUpdate && (
+									<p className="text-xs text-gray-500 mt-1">
+										Last: {new Date(lastSensorUpdate).toLocaleTimeString()}
+									</p>
+								)}
 							</div>
 						</div>
 					))}
 				</div>
 				{/* Removed filters/toolbar under metrics for a cleaner layout */}
+
+				{/* Loading and Error States */}
+				{isLoading && (
+					<div className="mt-6 bg-white p-8 rounded-lg shadow-md">
+						<div className="flex items-center justify-center">
+							<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mr-3"></div>
+							<span className="text-gray-600">Loading dashboard data...</span>
+						</div>
+					</div>
+				)}
+
+				{/* Error Display */}
+				{(Object.keys(errors).some(key => errors[key]) || mqttError) && (
+					<div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
+						<h3 className="text-red-800 font-semibold mb-2">⚠️ Some data could not be loaded:</h3>
+						<ul className="text-red-700 text-sm space-y-1">
+							{Object.entries(errors).map(([key, error]) => 
+								error && <li key={key}>• {key}: {error}</li>
+							)}
+							{mqttError && <li>• MQTT Sensors: {mqttError}</li>}
+						</ul>
+					</div>
+				)}
 
 				{/* Content Grid */}
 				<div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -495,12 +947,425 @@ export default function ITDashboard() {
 								{activeTab === 'Servers' && 'Server Fleet'}
 								{activeTab === 'Users' && 'Users'}
 								{activeTab === 'Changes' && 'Change Requests'}
+								{activeTab === 'IoT' && 'IoT Sensor Dashboard'}
 							</h2>
 							<button className="btn-quiet" onClick={exportCSV}><Download className="w-4 h-4 mr-2" /> Export CSV</button>
 						</div>
-						<div className="overflow-x-auto">
-							<table className="w-full text-left it-table">
-								<thead>
+						{activeTab === 'IoT' ? (
+							<div className="space-y-6">
+								{/* Professional MQTT Connection Status */}
+								<div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+									<div className="bg-gradient-to-r from-indigo-600 to-blue-600 px-6 py-4">
+										<h3 className="text-lg font-semibold text-white flex items-center">
+											<Cloud className="w-5 h-5 mr-3" />
+											MQTT Broker Connection
+										</h3>
+										<p className="text-indigo-100 text-sm mt-1">Real-time sensor data stream</p>
+									</div>
+									
+									<div className="p-6">
+										<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+											{/* Connection Status */}
+											<div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg border border-slate-200 p-4">
+												<div className="flex items-center justify-between mb-3">
+													<div className="flex items-center">
+														<div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+															mqttStatus.includes("Connected") ? 'bg-green-500' : 'bg-red-500'
+														}`}>
+															<Wifi className="w-5 h-5 text-white" />
+														</div>
+														<div>
+															<h4 className="font-semibold text-gray-800">Connection</h4>
+															<p className="text-sm text-gray-500">MQTT Broker</p>
+														</div>
+													</div>
+													<div className={`w-3 h-3 rounded-full ${
+														mqttStatus.includes("Connected") ? 'bg-green-400 animate-pulse' : 'bg-red-400'
+													}`}></div>
+												</div>
+												<div className={`text-lg font-bold ${
+													mqttStatus.includes("Connected") ? 'text-green-600' : 'text-red-600'
+												}`}>
+													{mqttStatus.includes("Connected") ? "Online" : "Offline"}
+												</div>
+												<div className="text-sm text-gray-600 mt-1">
+													{mqttStatus}
+												</div>
+											</div>
+
+											{/* Data Stream Status */}
+											<div className="bg-gradient-to-br from-slate-50 to-purple-50 rounded-lg border border-slate-200 p-4">
+												<div className="flex items-center justify-between mb-3">
+													<div className="flex items-center">
+														<div className={`w-10 h-10 rounded-lg flex items-center justify-center mr-3 ${
+															!isSensorDataStale ? 'bg-purple-500' : 'bg-gray-500'
+														}`}>
+															<ActivityIcon className="w-5 h-5 text-white" />
+														</div>
+														<div>
+															<h4 className="font-semibold text-gray-800">Data Stream</h4>
+															<p className="text-sm text-gray-500">Sensor Readings</p>
+														</div>
+													</div>
+													<div className={`w-3 h-3 rounded-full ${
+														!isSensorDataStale ? 'bg-purple-400 animate-pulse' : 'bg-gray-400'
+													}`}></div>
+												</div>
+												<div className={`text-lg font-bold ${
+													!isSensorDataStale ? 'text-purple-600' : 'text-gray-600'
+												}`}>
+													{!isSensorDataStale ? "Active" : "Stale"}
+												</div>
+												<div className="text-sm text-gray-600 mt-1">
+													{lastSensorUpdate ? 
+														`Last: ${new Date(lastSensorUpdate).toLocaleTimeString()}` : 
+														'No data received'
+													}
+												</div>
+											</div>
+
+											{/* Broker Information */}
+											<div className="bg-gradient-to-br from-slate-50 to-green-50 rounded-lg border border-slate-200 p-4">
+												<div className="flex items-center justify-between mb-3">
+													<div className="flex items-center">
+														<div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
+															<Server className="w-5 h-5 text-white" />
+														</div>
+														<div>
+															<h4 className="font-semibold text-gray-800">Broker Info</h4>
+															<p className="text-sm text-gray-500">HiveMQ Cloud</p>
+														</div>
+													</div>
+													<div className="w-3 h-3 rounded-full bg-blue-400"></div>
+												</div>
+												<div className="text-lg font-bold text-green-600">
+													EU-Central
+												</div>
+												<div className="text-sm text-gray-600 mt-1">
+													Port: 8884 (WSS)
+												</div>
+											</div>
+										</div>
+
+										{/* Active Topics */}
+										<div className="mt-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-lg p-4 border border-gray-200">
+											<h5 className="font-semibold text-gray-800 mb-3 flex items-center">
+												<LayoutDashboard className="w-4 h-4 mr-2" />
+												Active Subscriptions
+											</h5>
+											<div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+												<div className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-100">
+													<div className="flex items-center">
+														<div className="w-2 h-2 bg-blue-400 rounded-full mr-3"></div>
+														<span className="font-mono text-sm text-gray-700">ESP32/sensors</span>
+													</div>
+													<span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">ESP-01</span>
+												</div>
+												<div className="flex items-center justify-between bg-white rounded-lg p-3 border border-gray-100">
+													<div className="flex items-center">
+														<div className="w-2 h-2 bg-purple-400 rounded-full mr-3"></div>
+														<span className="font-mono text-sm text-gray-700">ESP32/sensors2</span>
+													</div>
+													<span className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded">ESP-02</span>
+												</div>
+											</div>
+										</div>
+
+										{/* Error Display */}
+										{mqttError && (
+											<div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4">
+												<div className="flex items-start">
+													<AlertTriangle className="w-5 h-5 text-red-600 mr-3 mt-0.5" />
+													<div>
+														<h6 className="font-semibold text-red-800 mb-1">Connection Error</h6>
+														<p className="text-red-700 text-sm">{mqttError}</p>
+													</div>
+												</div>
+											</div>
+										)}
+									</div>
+								</div>
+
+								{/* Live ESP32 Sensors */}
+								{liveSensors.temperature !== null && !isSensorDataStale && (
+									<div className="bg-green-50 border border-green-200 rounded-lg p-4">
+										<h3 className="text-lg font-semibold text-green-800 mb-3 flex items-center">
+											<ActivityIcon className="w-5 h-5 mr-2" />
+											🔴 Live ESP32 Sensors
+										</h3>
+										<div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-sm">
+											<div className="text-center">
+												<Thermometer className="w-6 h-6 mx-auto mb-1 text-blue-500" />
+												<div className="font-semibold">{Number(liveSensors.temperature).toFixed(1)}°C</div>
+												<div className="text-gray-600">Temperature</div>
+											</div>
+											<div className="text-center">
+												<Droplet className="w-6 h-6 mx-auto mb-1 text-blue-500" />
+												<div className="font-semibold">{liveSensors.humidity !== null ? Number(liveSensors.humidity).toFixed(1) + '%' : 'N/A'}</div>
+												<div className="text-gray-600">Humidity</div>
+											</div>
+											<div className="text-center">
+												<Flame className="w-6 h-6 mx-auto mb-1 text-red-500" />
+												<div className="font-semibold">{liveSensors.smoke1 !== null ? Number(liveSensors.smoke1).toFixed(1) : 'N/A'}</div>
+												<div className="text-gray-600">Smoke 1</div>
+											</div>
+											<div className="text-center">
+												<Flame className="w-6 h-6 mx-auto mb-1 text-red-500" />
+												<div className="font-semibold">{liveSensors.smoke2 !== null ? Number(liveSensors.smoke2).toFixed(1) : 'N/A'}</div>
+												<div className="text-gray-600">Smoke 2</div>
+											</div>
+											<div className="text-center">
+												<Zap className="w-6 h-6 mx-auto mb-1 text-purple-500" />
+												<div className="font-semibold">{liveSensors.proximity !== null ? Number(liveSensors.proximity).toFixed(1) : 'N/A'}</div>
+												<div className="text-gray-600">Proximity</div>
+											</div>
+										</div>
+										<div className="text-xs text-gray-500 mt-3">
+											Last update: {new Date(lastSensorUpdate).toLocaleTimeString()}
+										</div>
+									</div>
+								)}
+
+								{/* Professional IoT Sensors Grid */}
+								<div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
+									<div className="bg-gradient-to-r from-blue-600 to-purple-600 px-6 py-4">
+										<h3 className="text-xl font-semibold text-white flex items-center">
+											<Server className="w-6 h-6 mr-3" />
+											IoT Environmental Monitoring
+										</h3>
+										<p className="text-blue-100 text-sm mt-1">Real-time sensor data from datacenter nodes</p>
+									</div>
+									
+									<div className="p-6">
+										{/* Dynamic grid layout based on whether averages are shown */}
+										<div className={`grid gap-6 ${(iotReadings.esp1 || iotReadings.esp2) ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1 lg:grid-cols-2 justify-items-center max-w-4xl mx-auto'}`}>
+											{/* Average Metrics Card */}
+											{(iotReadings.esp1 || iotReadings.esp2) && (
+												<div className="bg-gradient-to-br from-slate-50 to-green-50 rounded-lg border border-slate-200 p-5">
+													<div className="flex items-center justify-between mb-4">
+														<div className="flex items-center">
+															<div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
+																<LayoutDashboard className="w-5 h-5 text-white" />
+															</div>
+															<div>
+																<h4 className="font-semibold text-gray-800">Environment Avg</h4>
+																<p className="text-sm text-gray-500">Calculated Metrics</p>
+															</div>
+														</div>
+														<div className="w-3 h-3 rounded-full bg-blue-400 animate-pulse"></div>
+													</div>
+													
+													<div className="grid grid-cols-2 gap-4">
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Thermometer className="w-4 h-4 text-red-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Temperature</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{iotAverages.temperature}°C</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Droplet className="w-4 h-4 text-blue-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Humidity</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{iotAverages.humidity}%</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Flame className="w-4 h-4 text-orange-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Smoke Level</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{iotAverages.smoke}</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Zap className="w-4 h-4 text-purple-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Power</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{iotAverages.power}V</div>
+														</div>
+													</div>
+													
+													{iotReadings.esp1 && !iotReadings.esp2 && (
+														<div className="text-xs text-gray-500 mt-3 text-center">
+															* Based on ESP-01 data only
+														</div>
+													)}
+													{iotReadings.esp1 && iotReadings.esp2 && (
+														<div className="text-xs text-green-600 mt-3 text-center font-medium">
+															✓ Multi-node average active
+														</div>
+													)}
+												</div>
+											)}
+
+											{/* ESP1 Sensor Node */}
+											<div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg border border-slate-200 p-5 w-full max-w-md">
+												<div className="flex items-center justify-between mb-4">
+													<div className="flex items-center">
+														<div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
+															<Server className="w-5 h-5 text-white" />
+														</div>
+														<div>
+															<h4 className="font-semibold text-gray-800">Node ESP-01</h4>
+															<p className="text-sm text-gray-500">Primary Sensor</p>
+														</div>
+													</div>
+													<div className={`w-3 h-3 rounded-full ${iotReadings.esp1 ? 'bg-green-400 animate-pulse' : 'bg-gray-300'}`}></div>
+												</div>
+												
+												{iotReadings.esp1 ? (
+													<div className="grid grid-cols-2 gap-4">
+														<div className={`bg-white rounded-lg p-3 border ${
+															iotReadings.esp1.temperature >= SENSOR_THRESHOLDS.temperature.critical ? 'border-red-300 bg-red-50' :
+															iotReadings.esp1.temperature > SENSOR_THRESHOLDS.temperature.max ? 'border-yellow-300 bg-yellow-50' :
+															'border-gray-100'
+														}`}>
+															<div className="flex items-center mb-2">
+																<Thermometer className={`w-4 h-4 mr-2 ${
+																	iotReadings.esp1.temperature >= SENSOR_THRESHOLDS.temperature.critical ? 'text-red-600' :
+																	iotReadings.esp1.temperature > SENSOR_THRESHOLDS.temperature.max ? 'text-yellow-600' :
+																	'text-red-500'
+																}`} />
+																<span className="text-sm font-medium text-gray-600">Temperature</span>
+															</div>
+															<div className={`text-2xl font-bold ${
+																iotReadings.esp1.temperature >= SENSOR_THRESHOLDS.temperature.critical ? 'text-red-600' :
+																iotReadings.esp1.temperature > SENSOR_THRESHOLDS.temperature.max ? 'text-yellow-600' :
+																'text-gray-800'
+															}`}>{Number(iotReadings.esp1.temperature).toFixed(1)}°C</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Droplet className="w-4 h-4 text-blue-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Humidity</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp1.humidity).toFixed(1)}%</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Flame className="w-4 h-4 text-orange-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Smoke Level</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp1.smoke).toFixed(1)}</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Zap className="w-4 h-4 text-purple-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Power</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp1.power).toFixed(1)}V</div>
+														</div>
+													</div>
+												) : (
+													<div className="text-center py-8 text-gray-500">
+														<div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+															<Server className="w-6 h-6 text-gray-400" />
+														</div>
+														<p className="font-medium">Waiting for sensor data...</p>
+														<p className="text-sm mt-1">Node may be offline or initializing</p>
+													</div>
+												)}
+											</div>
+
+											{/* ESP2 Sensor Node */}
+											<div className="bg-gradient-to-br from-slate-50 to-purple-50 rounded-lg border border-slate-200 p-5 w-full max-w-md">
+												<div className="flex items-center justify-between mb-4">
+													<div className="flex items-center">
+														<div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
+															<Server className="w-5 h-5 text-white" />
+														</div>
+														<div>
+															<h4 className="font-semibold text-gray-800">Node ESP-02</h4>
+															<p className="text-sm text-gray-500">Secondary Sensor</p>
+														</div>
+													</div>
+													<div className={`w-3 h-3 rounded-full ${iotReadings.esp2 ? 'bg-green-400 animate-pulse' : 'bg-gray-300'}`}></div>
+												</div>
+												
+												{iotReadings.esp2 ? (
+													<div className="grid grid-cols-2 gap-4">
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Thermometer className="w-4 h-4 text-red-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Temperature</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp2.temperature).toFixed(1)}°C</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Droplet className="w-4 h-4 text-blue-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Humidity</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp2.humidity).toFixed(1)}%</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Flame className="w-4 h-4 text-orange-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Smoke Level</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp2.smoke).toFixed(1)}</div>
+														</div>
+														<div className="bg-white rounded-lg p-3 border border-gray-100">
+															<div className="flex items-center mb-2">
+																<Zap className="w-4 h-4 text-purple-500 mr-2" />
+																<span className="text-sm font-medium text-gray-600">Power</span>
+															</div>
+															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp2.power).toFixed(1)}V</div>
+														</div>
+													</div>
+												) : (
+													<div className="text-center py-8 text-gray-500">
+														<div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+															<Server className="w-6 h-6 text-gray-400" />
+														</div>
+														<p className="font-medium">Waiting for sensor data...</p>
+														<p className="text-sm mt-1">Node may be offline or initializing</p>
+													</div>
+												)}
+											</div>
+										</div>
+
+										{/* Summary Statistics */}
+										{(iotReadings.esp1 || iotReadings.esp2) && (
+											<div className="mt-6 bg-gradient-to-r from-gray-50 to-slate-50 rounded-lg p-4 border border-gray-200">
+												<h5 className="font-semibold text-gray-800 mb-3 flex items-center">
+													<LayoutDashboard className="w-4 h-4 mr-2" />
+													Environmental Summary
+												</h5>
+												<div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+													<div>
+														<div className="text-xl font-bold text-gray-800">{iotAverages.temperature}°C</div>
+														<div className="text-sm text-gray-600">Avg Temperature</div>
+													</div>
+													<div>
+														<div className="text-xl font-bold text-gray-800">{iotAverages.humidity}%</div>
+														<div className="text-sm text-gray-600">Avg Humidity</div>
+													</div>
+													<div>
+														<div className="text-xl font-bold text-gray-800">{iotAverages.smoke}</div>
+														<div className="text-sm text-gray-600">Avg Smoke</div>
+													</div>
+													<div>
+														<div className="text-xl font-bold text-gray-800">{iotAverages.power}V</div>
+														<div className="text-sm text-gray-600">Avg Power</div>
+													</div>
+												</div>
+												{iotReadings.esp1 && !iotReadings.esp2 && (
+													<div className="text-xs text-gray-500 mt-2 text-center">
+														* Averages based on ESP-01 data only
+													</div>
+												)}
+											</div>
+										)}
+									</div>
+								</div>
+							</div>
+						) : (
+							<>
+								<div className="overflow-x-auto">
+									<table className="w-full text-left it-table">
+										<thead>
 									{activeTab === 'Incidents' && (
 										<tr>
 											<th>Ticket ID</th>
@@ -551,8 +1416,8 @@ export default function ITDashboard() {
 										<tr key={row._id}>
 											<td>{row._id}</td>
 											<td>{row.issue}</td>
-											<td><span className={`badge ${priorityToClass(row.priority)}`}>{row.priority}</span></td>
-											<td><span className={`badge ${statusToClass(row.status)}`}>{row.status}</span></td>
+											<td><StatusBadge status={row.priority} type="priority" /></td>
+											<td><StatusBadge status={row.status} /></td>
 											<td>{row.supportAgentId?.name || 'Unassigned'}</td>
 											<td>{row.history?.length ? new Date(row.history[row.history.length - 1].timestamp).toLocaleString() : new Date(row.createdAt).toLocaleString()}</td>
 										</tr>
@@ -562,7 +1427,7 @@ export default function ITDashboard() {
 											<td>{a.id}</td>
 											<td>{a.type}</td>
 											<td>{a.owner}</td>
-											<td><span className={statusToClass(a.status)}>{a.status}</span></td>
+											<td><StatusBadge status={a.status} /></td>
 											<td>{a.location}</td>
 										</tr>
 									))}
@@ -594,37 +1459,39 @@ export default function ITDashboard() {
 											<td>{new Date(u.createdAt).toLocaleString()}</td>
 										</tr>
 									))}
-								</tbody>
-							</table>
-						</div>
-						<div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-							<div className="flex items-center space-x-2">
-								<span>Show</span>
-								<select
-									className="it-select"
-									value={rowsPerPage}
-									onChange={e => setRowsPerPage(Number(e.target.value))}
-								>
-									{[5,10,20].map(n => <option key={n} value={n}>{n}</option>)}
-								</select>
-								<span>rows</span>
-							</div>
-							<div className="space-x-2">
-								<button
-									className="btn-quiet"
-									disabled={currentPage <= 1}
-									onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
-								>Prev</button>
-								<button className="btn-primary btn-small" disabled>
-									{currentPage} / {maxPage}
-								</button>
-								<button
-									className="btn-quiet"
-									disabled={currentPage >= maxPage}
-									onClick={() => setCurrentPage(p => Math.min(p + 1, maxPage))}
-								>Next</button>
-							</div>
-						</div>
+										</tbody>
+									</table>
+								</div>
+								<div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+									<div className="flex items-center space-x-2">
+										<span>Show</span>
+										<select
+											className="it-select"
+											value={rowsPerPage}
+											onChange={e => setRowsPerPage(Number(e.target.value))}
+										>
+											{[5,10,20].map(n => <option key={n} value={n}>{n}</option>)}
+										</select>
+										<span>rows</span>
+									</div>
+									<div className="space-x-2">
+										<button
+											className="btn-quiet"
+											disabled={currentPage <= 1}
+											onClick={() => setCurrentPage(p => Math.max(p - 1, 1))}
+										>Prev</button>
+										<button className="btn-primary btn-small" disabled>
+											{currentPage} / {maxPage}
+										</button>
+										<button
+											className="btn-quiet"
+											disabled={currentPage >= maxPage}
+											onClick={() => setCurrentPage(p => Math.min(p + 1, maxPage))}
+										>Next</button>
+									</div>
+								</div>
+							</>
+						)}
 					</div>
 
 					{/* Right column: Real-time Alerts, Health & Activity */}
@@ -635,6 +1502,11 @@ export default function ITDashboard() {
 								<h3 className="font-semibold text-gray-800 flex items-center">
 								<Bell className="w-4 h-4 mr-2" />
 								Live Alerts
+								{realtimeAlerts.length > 0 && (
+									<span className="ml-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center font-semibold">
+										{realtimeAlerts.length > 9 ? '9+' : realtimeAlerts.length}
+									</span>
+								)}
 								<span className={`ml-2 w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></span>
 							</h3>
 								{realtimeAlerts.length > 0 && (
@@ -656,9 +1528,13 @@ export default function ITDashboard() {
 											<p className="text-gray-500 text-sm font-medium">All clear!</p>
 											<p className="text-gray-400 text-xs mt-1">No active alerts at the moment</p>
 										</div>
-									) : (
-										<div className="space-y-3 max-h-96 overflow-y-auto alert-scroll">
-											{realtimeAlerts.slice(0, 10).map((alert) => {
+																) : (
+								<div className="space-y-3 max-h-96 overflow-y-auto alert-scroll">
+									{Array.isArray(realtimeAlerts) && realtimeAlerts.slice(0, 10).map((alert) => {
+										if (!alert || !alert._id) {
+											console.warn('Invalid alert object:', alert);
+											return null;
+										}
 												const getAlertStyle = () => {
 													if (alert.status === 'resolved') {
 														return {
@@ -748,20 +1624,20 @@ export default function ITDashboard() {
 																		<div className="flex items-center space-x-2">
 													{!alert.read && (
 														<button 
-															onClick={() => markAlertAsRead(alert._id)}
-																					className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+															onClick={() => alertActions.markAsRead(alert._id)}
+															className="inline-flex items-center justify-center w-8 h-8 bg-blue-500 hover:bg-blue-600 text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
 															title="Mark as read"
 														>
-																					<Eye className="w-4 h-4" />
+															<Eye className="w-4 h-4" />
 														</button>
 													)}
-														<button 
-															onClick={() => resolveAlert(alert._id)}
-																				className="inline-flex items-center justify-center w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-																				title="Resolve alert"
-														>
-																				<CheckCircle2 className="w-4 h-4" />
-														</button>
+													<button 
+														onClick={() => alertActions.resolve(alert._id)}
+														className="inline-flex items-center justify-center w-8 h-8 bg-green-500 hover:bg-green-600 text-white rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
+														title="Resolve alert"
+													>
+														<CheckCircle2 className="w-4 h-4" />
+													</button>
 																		</div>
 													)}
 												</div>
@@ -814,5 +1690,3 @@ export default function ITDashboard() {
 		</div>
 	);
 }
-
-

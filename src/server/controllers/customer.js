@@ -3,6 +3,7 @@ import SupportTicket from '../models/supportTicket.js';
 import User from '../models/user.js';
 import Product from '../models/product.js';
 import Service from '../models/service.js'; // Import Service model
+import Invoice from '../models/invoice.js';
 import mongoose from 'mongoose';
 
 /* ===============================
@@ -169,8 +170,14 @@ export const addServiceToCustomer = async (req, res) => {
     const customer = await Customer.findById(customerId);
     if (!customer) return res.status(404).json({ message: "Customer not found" });
 
-    const service = await Service.findById(serviceId);
+    const service = await Service.findById(serviceId).populate('associatedProducts');
     if (!service) return res.status(404).json({ message: "Service not found" });
+
+    // Prevent duplicate purchase of same service (optional safeguard)
+    const already = customer.purchasedServices.some(ps => ps.serviceId.toString() === serviceId);
+    if (already) {
+      return res.status(200).json({ message: "Service already added", customer });
+    }
 
     // push new service purchase into purchasedServices
     customer.purchasedServices.push({
@@ -182,7 +189,45 @@ export const addServiceToCustomer = async (req, res) => {
 
     await customer.save();
 
-    res.status(200).json({ message: "Service added to customer", customer });
+    // --- Auto-generate invoice for this service selection ---
+    // Compute amount from associated product prices if available; fallback 0
+    let amount = 0;
+    const lineItems = [];
+    if (service.associatedProducts && service.associatedProducts.length > 0) {
+      service.associatedProducts.forEach(prod => {
+        const price = prod.price || 0;
+        amount += price;
+        lineItems.push({
+          productId: prod._id,
+          description: prod.description || prod.name,
+          quantity: 1,
+          unitPrice: price
+        });
+      });
+    } else {
+      // No products; create a single line item referencing the service itself (logical placeholder)
+      lineItems.push({
+        description: `Service: ${service.name}`,
+        quantity: 1,
+        unitPrice: 0
+      });
+    }
+
+    const issueDate = new Date();
+    const dueDate = new Date(issueDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+    const invoiceNumber = `INV-${issueDate.getFullYear()}${String(issueDate.getMonth()+1).padStart(2,'0')}${String(issueDate.getDate()).padStart(2,'0')}-${Math.floor(Math.random()*90000+10000)}`;
+
+    const invoice = await Invoice.create({
+      customerId: customer.userId, // invoice schema references User
+      invoiceNumber,
+      amount,
+      status: 'unpaid',
+      issueDate,
+      dueDate,
+      lineItems
+    });
+
+    res.status(200).json({ message: "Service added to customer", customer, invoice });
   } catch (error) {
     console.error("Error adding service to customer:", error);
     res.status(500).json({ message: "Internal server error" });

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import axios from "axios";
 import "./adminview.css";
 import BloomLogo from "../../assets/Bloom_Logo.svg";
-const api = axios.create({ baseURL: "http://localhost:3000/api" });
+const api = axios.create({ baseURL: "/api" });
 import { toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { ToastContainer } from "react-toastify";
@@ -1528,72 +1528,6 @@ export default function Dashboard() {
                             <div className="info-item">No products linked.</div>
                         )}
 
-
-                        <div className="modal-actions">
-                            {!assignMode ? (
-                                <button onClick={() => setAssignMode(true)}>Assign to Customer</button>
-                            ) : (
-                                <div className="form-field">
-                                    {/* Select Customer */}
-                                    <select
-                                        value={selectedCustomer}
-                                        onChange={(e) => setSelectedCustomer(e.target.value)}
-                                    >
-                                        <option value="">No customer</option>
-                                        {customers.map((c) => (
-                                            <option key={c._id} value={c._id}>
-                                                {c.companyName}
-                                            </option>
-                                        ))}
-                                    </select>
-
-                                    {/* Input for IP Address */}
-                                    <input
-                                        type="text"
-                                        placeholder="Enter IP Address"
-                                        value={ipAddress}
-                                        onChange={(e) => setIpAddress(e.target.value)}
-                                        style={{ marginTop: "0.5rem" }}
-                                    />
-
-                                    <div style={{ marginTop: "0.5rem", display: "flex", gap: "0.5rem" }}>
-                                        <button
-                                            onClick={async () => {
-                                                try {
-                                                    await api.post("/customers/add-service", {
-                                                        customerId: selectedCustomer,
-                                                        serviceId: selected._id, // notice: use the service you're editing
-                                                        ipAddress: ipAddress || ""
-                                                    });
-
-                                                    // update locally if needed
-                                                    setSelected((prev) => ({
-                                                        ...prev,
-                                                        customerId: selectedCustomer,
-                                                        ipAddress: ipAddress
-                                                    }));
-
-                                                    setAssignMode(false);
-                                                    setSelectedCustomer("");
-                                                    setIpAddress("");
-                                                    setModalType(null);
-                                                    toast.success("✅ Service Assigned successfully!");
-                                                } catch (err) {
-                                                    alert("Failed to assign: " + (err.response?.data?.error || err.message));
-                                                }
-                                            }}
-                                        >
-                                            Save
-                                        </button>
-                                        <button onClick={() => {
-                                            setAssignMode(false);
-                                            setSelectedCustomer("");
-                                            setIpAddress("");
-                                        }}>Cancel</button>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
                     </div>
                 )}
 

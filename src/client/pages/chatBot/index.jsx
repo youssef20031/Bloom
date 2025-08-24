@@ -20,7 +20,7 @@ export default function ChatBot() {
     const [sessions, setSessions] = useState([]);
     const [selectedSession, setSelectedSession] = useState(null);
     const user= localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
-    const API_BASE = 'http://localhost:3000/api/chat'; 
+    const API_BASE = '/api/chat';
     const PRESALES_USER_ID = user._id || undefined;
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [sessionToDelete, setSessionToDelete] = useState(null);
