@@ -8,7 +8,7 @@ import mqtt from "mqtt";
 const BROKER_URL = "wss://c2e0fd901fdb464e8b397971387b99f7.s1.eu.hivemq.cloud:8884/mqtt";
 const USERNAME = "seiff";
 const PASSWORD = "Seif1234";
-const TOPIC = "ESP32/sensors";
+const TOPIC = "ESP32/sensors1";
 const TOPIC2 = "ESP32/sensors2";
 const STALE_AFTER_MS = 5000;
 
@@ -98,6 +98,7 @@ export default function ITDashboard() {
 	});
 	const [errors, setErrors] = useState({});
 	const [recentAlertHistory, setRecentAlertHistory] = useState(new Set()); // Track recent alerts to prevent spam
+	const [debugMode, setDebugMode] = useState(false); // Debug mode toggle
 	const alertSound = useRef(null);
 	
 	// IoT Dashboard States (from test.jsx)
@@ -488,39 +489,71 @@ export default function ITDashboard() {
 			console.log('🚨 New alert received in IT Dashboard:', data);
 			console.log('Alert data structure:', JSON.stringify(data, null, 2));
 			
-			setRealtimeAlerts(prev => {
-				const updated = [data.alert, ...prev.slice(0, 9)]; // Keep last 10 alerts
-				console.log('Updated realtime alerts:', updated.length);
-				return updated;
-			});
-			setAlerts(prev => [data.alert, ...prev]); // Add to main alerts list
-			
-			// Play alert sound (optional)
-			if (alertSound.current) {
-				alertSound.current.play().catch(e => console.log('Could not play alert sound'));
+			try {
+				// Handle both data formats: {alert: ...} and direct alert object
+				const alert = data.alert || data;
+				
+				if (!alert || typeof alert !== 'object') {
+					console.error('❌ Invalid alert data received:', data);
+					return;
+				}
+				
+				setRealtimeAlerts(prev => {
+					const updated = [alert, ...prev.slice(0, 9)]; // Keep last 10 alerts
+					console.log('Updated realtime alerts:', updated.length);
+					return updated;
+				});
+				setAlerts(prev => [alert, ...prev]); // Add to main alerts list
+				
+				// Play alert sound (optional)
+				if (alertSound.current) {
+					alertSound.current.play().catch(e => console.log('Could not play alert sound'));
+				}
+			} catch (error) {
+				console.error('❌ Error processing new alert:', error);
 			}
 		});
 		
 		// Listen for alert updates
 		socketService.onAlertUpdate((data) => {
 			console.log('📝 Alert updated:', data);
-			setAlerts(prev => prev.map(alert => 
-				alert._id === data.alert._id ? data.alert : alert
-			));
-			setRealtimeAlerts(prev => prev.map(alert => 
-				alert._id === data.alert._id ? data.alert : alert
-			));
+			try {
+				const alert = data.alert || data;
+				if (!alert || !alert._id) {
+					console.error('❌ Invalid alert update data:', data);
+					return;
+				}
+				
+				setAlerts(prev => prev.map(a => 
+					a._id === alert._id ? alert : a
+				));
+				setRealtimeAlerts(prev => prev.map(a => 
+					a._id === alert._id ? alert : a
+				));
+			} catch (error) {
+				console.error('❌ Error processing alert update:', error);
+			}
 		});
 		
 		// Listen for alert resolutions
 		socketService.onAlertResolved((data) => {
 			console.log('✅ Alert resolved:', data);
-			setAlerts(prev => prev.map(alert => 
-				alert._id === data.alert._id ? data.alert : alert
-			));
-			setRealtimeAlerts(prev => prev.map(alert => 
-				alert._id === data.alert._id ? data.alert : alert
-			));
+			try {
+				const alert = data.alert || data;
+				if (!alert || !alert._id) {
+					console.error('❌ Invalid alert resolution data:', data);
+					return;
+				}
+				
+				setAlerts(prev => prev.map(a => 
+					a._id === alert._id ? alert : a
+				));
+				setRealtimeAlerts(prev => prev.map(a => 
+					a._id === alert._id ? alert : a
+				));
+			} catch (error) {
+				console.error('❌ Error processing alert resolution:', error);
+			}
 		});
 		
 		// Test the connection
@@ -557,18 +590,70 @@ export default function ITDashboard() {
 	useEffect(() => {
 		const fetchWithErrorHandling = async ({ url, setter, label, key }) => {
 			try {
+				console.log(`🔍 Starting fetch for ${label} from ${url}`);
 				setLoadingStates(prev => ({ ...prev, [key]: true }));
 				setErrors(prev => ({ ...prev, [key]: null }));
 				
 				const response = await fetch(url);
+				console.log(`📡 Response for ${label}:`, response.status, response.statusText);
+				
 				if (!response.ok) {
 					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
 				}
+				
 				const data = await response.json();
-				setter(data);
-				console.log(`✅ Successfully loaded ${label}:`, data.length || 'N/A');
+				console.log(`📊 Raw data for ${label}:`, data);
+				console.log(`📊 Data type for ${label}:`, typeof data, Array.isArray(data) ? `Array(${data.length})` : 'Not array');
+				
+				// Validate data structure based on endpoint
+				const validateDataStructure = (data, endpoint) => {
+					if (!Array.isArray(data)) {
+						console.warn(`⚠️ Expected array for ${endpoint}, got:`, typeof data);
+						return false;
+					}
+					
+					if (data.length > 0) {
+						const sample = data[0];
+						console.log(`🔍 Sample ${endpoint} object:`, sample);
+						
+						// Check required fields based on endpoint
+						const requiredFields = {
+							'/api/support-ticket': ['_id', 'issue', 'status'],
+							'/api/users': ['_id', 'name', 'email'],
+							'/api/datacenter': ['_id', 'assetType'],
+							'/api/service': ['_id', 'name', 'type'],
+							'/api/alerts': ['_id', 'type', 'severity']
+						};
+						
+						const required = requiredFields[endpoint] || [];
+						const missing = required.filter(field => !(field in sample));
+						
+						if (missing.length > 0) {
+							console.warn(`⚠️ Missing required fields in ${endpoint}:`, missing);
+							console.warn(`⚠️ Available fields:`, Object.keys(sample));
+						} else {
+							console.log(`✅ Data structure validation passed for ${endpoint}`);
+						}
+					}
+					
+					return true;
+				};
+				
+				// Validate data before setting
+				if (data === null || data === undefined) {
+					console.warn(`⚠️ ${label} returned null/undefined, setting empty array`);
+					setter([]);
+				} else if (!validateDataStructure(data, url)) {
+					console.warn(`⚠️ Data structure validation failed for ${label}, setting empty array`);
+					setter([]);
+				} else {
+					setter(data);
+				}
+				
+				console.log(`✅ Successfully loaded ${label}:`, Array.isArray(data) ? data.length : 'N/A');
 			} catch (error) {
 				console.error(`❌ Failed to load ${label} from ${url}:`, error);
+				console.error(`❌ Error details:`, error.stack);
 				setErrors(prev => ({ ...prev, [key]: error.message }));
 				setter([]);
 			} finally {
@@ -585,44 +670,95 @@ export default function ITDashboard() {
 	}, [dataEndpoints]);
 	// Search term state
 	const [searchTerm, setSearchTerm] = useState('');
-	// Filtered data based on search term
+	// Filtered data based on search term with safety checks
 	const filteredIncidents = useMemo(() => {
+		if (!Array.isArray(incidents)) {
+			console.warn('⚠️ incidents is not an array:', incidents);
+			return [];
+		}
+		
 		const term = searchTerm.toLowerCase();
-		return incidents.filter(i =>
-			i._id.toLowerCase().includes(term) ||
-			i.issue.toLowerCase().includes(term) ||
-			(i.supportAgentId?.name || '').toLowerCase().includes(term)
-		);
+		return incidents.filter(i => {
+			if (!i || typeof i !== 'object') {
+				console.warn('⚠️ Invalid incident object:', i);
+				return false;
+			}
+			
+			const id = i._id || i.id || '';
+			const issue = i.issue || '';
+			const agentName = i.supportAgentId?.name || '';
+			
+			return (
+				id.toString().toLowerCase().includes(term) ||
+				issue.toString().toLowerCase().includes(term) ||
+				agentName.toString().toLowerCase().includes(term)
+			);
+		});
 	}, [incidents, searchTerm]);
 	const filteredAssets = useMemo(() => {
+		if (!Array.isArray(assets)) {
+			console.warn('⚠️ assets is not an array:', assets);
+			return [];
+		}
+		
 		const term = searchTerm.toLowerCase();
-		return assets.filter(a =>
-			(a.assetId?.name || '').toLowerCase().includes(term) ||
-			a.assetType.toLowerCase().includes(term) ||
-			(a.location || '').toLowerCase().includes(term)
-		);
+		return assets.filter(a => {
+			if (!a || typeof a !== 'object') return false;
+			return (
+				(a.assetId?.name || '').toString().toLowerCase().includes(term) ||
+				(a.assetType || '').toString().toLowerCase().includes(term) ||
+				(a.location || '').toString().toLowerCase().includes(term)
+			);
+		});
 	}, [assets, searchTerm]);
+	
 	const filteredServers = useMemo(() => {
+		if (!Array.isArray(servers)) {
+			console.warn('⚠️ servers is not an array:', servers);
+			return [];
+		}
+		
 		const term = searchTerm.toLowerCase();
-		return servers.filter(s =>
-			(s.assetId?.name || '').toLowerCase().includes(term) ||
-			(s.location || '').toLowerCase().includes(term)
-		);
+		return servers.filter(s => {
+			if (!s || typeof s !== 'object') return false;
+			return (
+				(s.assetId?.name || '').toString().toLowerCase().includes(term) ||
+				(s.location || '').toString().toLowerCase().includes(term)
+			);
+		});
 	}, [servers, searchTerm]);
+	
 	const filteredChanges = useMemo(() => {
+		if (!Array.isArray(changes)) {
+			console.warn('⚠️ changes is not an array:', changes);
+			return [];
+		}
+		
 		const term = searchTerm.toLowerCase();
-		return changes.filter(c =>
-			c.name.toLowerCase().includes(term) ||
-			c.type.toLowerCase().includes(term)
-		);
+		return changes.filter(c => {
+			if (!c || typeof c !== 'object') return false;
+			return (
+				(c.name || '').toString().toLowerCase().includes(term) ||
+				(c.type || '').toString().toLowerCase().includes(term)
+			);
+		});
 	}, [changes, searchTerm]);
+	
 	const filteredUsers = useMemo(() => {
+		if (!Array.isArray(users)) {
+			console.warn('⚠️ users is not an array:', users);
+			return [];
+		}
+		
 		const term = searchTerm.toLowerCase();
-		return users.filter(u =>
-			u.name.toLowerCase().includes(term) ||
-			u.email.toLowerCase().includes(term) ||
-			u.role.toLowerCase().includes(term)
-		);
+		return users.filter(u => {
+			if (!u || typeof u !== 'object') return false;
+			return (
+				(u.name || '').toString().toLowerCase().includes(term) ||
+				(u.email || '').toString().toLowerCase().includes(term) ||
+				(u.role || '').toString().toLowerCase().includes(term)
+			);
+		});
 	}, [users, searchTerm]);
 	// Pagination state
 	const [rowsPerPage, setRowsPerPage] = useState(5);
@@ -789,6 +925,29 @@ export default function ITDashboard() {
 			}
 		}
 	};
+	// Add a safety check for critical data
+	if (isLoading && (!incidents && !assets && !users)) {
+		return (
+			<div className="flex h-screen items-center justify-center bg-gray-50">
+				<div className="text-center">
+					<div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+					<h2 className="text-xl font-semibold text-gray-700">Loading Dashboard...</h2>
+					<p className="text-gray-500 mt-2">Fetching data from server</p>
+				</div>
+			</div>
+		);
+	}
+
+	// Log current state for debugging
+	console.log('🎯 Current component state:', {
+		isLoading,
+		incidents: incidents?.length || 'undefined',
+		assets: assets?.length || 'undefined',
+		users: users?.length || 'undefined',
+		alerts: alerts?.length || 'undefined',
+		errors: Object.keys(errors).filter(key => errors[key]).length
+	});
+
 	return (
 		<div className="flex h-screen">
 			{/* Sidebar */}
@@ -855,12 +1014,21 @@ export default function ITDashboard() {
 								/>
 							</div>
 
-							{/* Sensor Alert Status */}
-							<div className="flex items-center space-x-2 text-sm">
+							{/* Sensor Alert Status & Debug Toggle */}
+							<div className="flex items-center space-x-4 text-sm">
 								<div className="flex items-center">
 									<div className={`w-2 h-2 rounded-full mr-2 ${(iotReadings.esp1 || iotReadings.esp2) ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
 									<span className="text-gray-600">Auto Alerts</span>
 								</div>
+								<button
+									onClick={() => setDebugMode(!debugMode)}
+									className={`px-2 py-1 rounded text-xs font-mono ${
+										debugMode ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'
+									} hover:bg-opacity-80 transition-colors`}
+									title="Toggle debug information"
+								>
+									{debugMode ? '🐛 Debug ON' : '🔧 Debug'}
+								</button>
 							</div>
 							
 							<button className="btn-primary"><Plus className="w-4 h-4 mr-2" /> New Incident</button>
@@ -923,16 +1091,99 @@ export default function ITDashboard() {
 					</div>
 				)}
 
-				{/* Error Display */}
+				{/* Debug Panel */}
+				{debugMode && (
+					<div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+						<h3 className="text-blue-800 font-semibold mb-3 flex items-center">
+							🐛 Debug Information
+							<button 
+								onClick={() => setDebugMode(false)}
+								className="ml-auto text-blue-600 hover:text-blue-800"
+								title="Close debug panel"
+							>
+								<X className="w-4 h-4" />
+							</button>
+						</h3>
+						<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+							<div className="bg-white rounded p-3">
+								<h4 className="font-semibold text-gray-800 mb-2">Data State</h4>
+								<ul className="space-y-1 text-gray-600">
+									<li>Incidents: {Array.isArray(incidents) ? incidents.length : 'Invalid'}</li>
+									<li>Assets: {Array.isArray(assets) ? assets.length : 'Invalid'}</li>
+									<li>Users: {Array.isArray(users) ? users.length : 'Invalid'}</li>
+									<li>Alerts: {Array.isArray(alerts) ? alerts.length : 'Invalid'}</li>
+									<li>Realtime Alerts: {realtimeAlerts.length}</li>
+								</ul>
+							</div>
+							<div className="bg-white rounded p-3">
+								<h4 className="font-semibold text-gray-800 mb-2">Loading State</h4>
+								<ul className="space-y-1 text-gray-600">
+									<li>Overall: {isLoading ? 'Loading...' : 'Ready'}</li>
+									{Object.entries(loadingStates).map(([key, loading]) => (
+										<li key={key}>
+											{key}: {loading ? 'Loading...' : 'Done'}
+										</li>
+									))}
+								</ul>
+							</div>
+							<div className="bg-white rounded p-3">
+								<h4 className="font-semibold text-gray-800 mb-2">Connections</h4>
+								<ul className="space-y-1 text-gray-600">
+									<li>WebSocket: {isConnected ? '✅ Connected' : '❌ Disconnected'}</li>
+									<li>MQTT: {mqttStatus}</li>
+									<li>Sensors: {!isSensorDataStale ? '✅ Fresh' : '⚠️ Stale'}</li>
+									<li>Last Update: {lastSensorUpdate ? new Date(lastSensorUpdate).toLocaleTimeString() : 'Never'}</li>
+								</ul>
+							</div>
+						</div>
+						{Object.keys(errors).length > 0 && (
+							<div className="mt-3 bg-red-50 rounded p-3">
+								<h4 className="font-semibold text-red-800 mb-2">Active Errors</h4>
+								<ul className="space-y-1 text-red-600 text-sm">
+									{Object.entries(errors).map(([key, error]) => 
+										error && <li key={key}>• {key}: {error}</li>
+									)}
+								</ul>
+							</div>
+						)}
+					</div>
+				)}
+
+				{/* Enhanced Error Display */}
 				{(Object.keys(errors).some(key => errors[key]) || mqttError) && (
 					<div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
 						<h3 className="text-red-800 font-semibold mb-2">⚠️ Some data could not be loaded:</h3>
 						<ul className="text-red-700 text-sm space-y-1">
 							{Object.entries(errors).map(([key, error]) => 
-								error && <li key={key}>• {key}: {error}</li>
+								error && (
+									<li key={key} className="flex items-start">
+										<span className="mr-2">•</span>
+										<div>
+											<strong>{key}:</strong> {error}
+											<div className="text-xs text-red-600 mt-1">
+												Check browser console for detailed error logs
+											</div>
+										</div>
+									</li>
+								)
 							)}
-							{mqttError && <li>• MQTT Sensors: {mqttError}</li>}
+							{mqttError && (
+								<li className="flex items-start">
+									<span className="mr-2">•</span>
+									<div>
+										<strong>MQTT Sensors:</strong> {mqttError}
+									</div>
+								</li>
+							)}
 						</ul>
+						<div className="mt-3 pt-3 border-t border-red-200">
+							<button 
+								onClick={() => window.location.reload()} 
+								className="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+							>
+								🔄 Retry Loading
+							</button>
+						</div>
 					</div>
 				)}
 
@@ -1412,53 +1663,155 @@ export default function ITDashboard() {
 									)}
 								</thead>
 								<tbody>
-									{activeTab === 'Incidents' && paginatedData.map((row) => (
-										<tr key={row._id}>
-											<td>{row._id}</td>
-											<td>{row.issue}</td>
-											<td><StatusBadge status={row.priority} type="priority" /></td>
-											<td><StatusBadge status={row.status} /></td>
-											<td>{row.supportAgentId?.name || 'Unassigned'}</td>
-											<td>{row.history?.length ? new Date(row.history[row.history.length - 1].timestamp).toLocaleString() : new Date(row.createdAt).toLocaleString()}</td>
-										</tr>
-									))}
-									{activeTab === 'Assets' && paginatedData.map((a) => (
-										<tr key={a.id}>
-											<td>{a.id}</td>
-											<td>{a.type}</td>
-											<td>{a.owner}</td>
-											<td><StatusBadge status={a.status} /></td>
-											<td>{a.location}</td>
-										</tr>
-									))}
-									{activeTab === 'Servers' && paginatedData.map((s) => {
-										const { assetId, location, latestReading } = s;
-										return (
-										<tr key={s._id}>
-											<td>{assetId?.name || s._id}</td>
-											<td>{location}</td>
-											<td>{latestReading?.temperature ?? '-'}</td>
-											<td>{latestReading?.powerDraw ?? '-'}</td>
-											<td>{latestReading?.timestamp ? new Date(latestReading.timestamp).toLocaleString() : '-'}</td>
-										</tr>
-										);
-									})}
-									{activeTab === 'Changes' && paginatedData.map((c) => (
-										<tr key={c._id}>
-											<td>{c.name}</td>
-											<td>{c.type}</td>
-											<td>{new Date(c.createdAt).toLocaleString()}</td>
-											<td>{new Date(c.updatedAt).toLocaleString()}</td>
-										</tr>
-									))}
-									{activeTab === 'Users' && paginatedData.map((u) => (
-										<tr key={u._id}>
-											<td>{u.name}</td>
-											<td>{u.email}</td>
-											<td>{u.role}</td>
-											<td>{new Date(u.createdAt).toLocaleString()}</td>
-										</tr>
-									))}
+									{activeTab === 'Incidents' && (
+										paginatedData.length > 0 ? (
+											paginatedData.map((row) => {
+												if (!row || !row._id) {
+													console.warn('⚠️ Invalid incident row:', row);
+													return null;
+												}
+												return (
+													<tr key={row._id}>
+														<td>{row._id || 'N/A'}</td>
+														<td>{row.issue || 'No description'}</td>
+														<td><StatusBadge status={row.priority || 'medium'} type="priority" /></td>
+														<td><StatusBadge status={row.status || 'open'} /></td>
+														<td>{row.supportAgentId?.name || 'Unassigned'}</td>
+														<td>{
+															row.history?.length ? 
+																new Date(row.history[row.history.length - 1].timestamp).toLocaleString() : 
+																new Date(row.createdAt || Date.now()).toLocaleString()
+														}</td>
+													</tr>
+												);
+											}).filter(Boolean)
+										) : (
+											<tr>
+												<td colSpan="6" className="text-center py-8 text-gray-500">
+													<div className="flex flex-col items-center">
+														<AlertTriangle className="w-8 h-8 text-gray-400 mb-2" />
+														<span>No incidents found</span>
+														<span className="text-sm mt-1">Check your search filters or add new incidents</span>
+													</div>
+												</td>
+											</tr>
+										)
+									)}
+									{activeTab === 'Assets' && (
+										paginatedData.length > 0 ? (
+											paginatedData.map((a) => {
+												if (!a || (!a.id && !a._id)) {
+													console.warn('⚠️ Invalid asset row:', a);
+													return null;
+												}
+												return (
+													<tr key={a.id || a._id}>
+														<td>{a.id || a._id || 'N/A'}</td>
+														<td>{a.type || a.assetType || 'Unknown'}</td>
+														<td>{a.owner || 'Unassigned'}</td>
+														<td><StatusBadge status={a.status || 'unknown'} /></td>
+														<td>{a.location || 'Not specified'}</td>
+													</tr>
+												);
+											}).filter(Boolean)
+										) : (
+											<tr>
+												<td colSpan="5" className="text-center py-8 text-gray-500">
+													<div className="flex flex-col items-center">
+														<Server className="w-8 h-8 text-gray-400 mb-2" />
+														<span>No assets found</span>
+														<span className="text-sm mt-1">Add assets to your inventory</span>
+													</div>
+												</td>
+											</tr>
+										)
+									)}
+									{activeTab === 'Servers' && (
+										paginatedData.length > 0 ? (
+											paginatedData.map((s) => {
+												if (!s || !s._id) {
+													console.warn('⚠️ Invalid server row:', s);
+													return null;
+												}
+												const { assetId, location, latestReading } = s;
+												return (
+													<tr key={s._id}>
+														<td>{assetId?.name || s._id || 'Unknown'}</td>
+														<td>{location || 'Not specified'}</td>
+														<td>{latestReading?.temperature ?? '-'}</td>
+														<td>{latestReading?.powerDraw ?? '-'}</td>
+														<td>{latestReading?.timestamp ? new Date(latestReading.timestamp).toLocaleString() : '-'}</td>
+													</tr>
+												);
+											}).filter(Boolean)
+										) : (
+											<tr>
+												<td colSpan="5" className="text-center py-8 text-gray-500">
+													<div className="flex flex-col items-center">
+														<Server className="w-8 h-8 text-gray-400 mb-2" />
+														<span>No servers found</span>
+														<span className="text-sm mt-1">Add servers to your fleet</span>
+													</div>
+												</td>
+											</tr>
+										)
+									)}
+									{activeTab === 'Changes' && (
+										paginatedData.length > 0 ? (
+											paginatedData.map((c) => {
+												if (!c || !c._id) {
+													console.warn('⚠️ Invalid change row:', c);
+													return null;
+												}
+												return (
+													<tr key={c._id}>
+														<td>{c.name || 'Unnamed service'}</td>
+														<td>{c.type || 'Unknown'}</td>
+														<td>{c.createdAt ? new Date(c.createdAt).toLocaleString() : 'N/A'}</td>
+														<td>{c.updatedAt ? new Date(c.updatedAt).toLocaleString() : 'N/A'}</td>
+													</tr>
+												);
+											}).filter(Boolean)
+										) : (
+											<tr>
+												<td colSpan="4" className="text-center py-8 text-gray-500">
+													<div className="flex flex-col items-center">
+														<Wrench className="w-8 h-8 text-gray-400 mb-2" />
+														<span>No change requests found</span>
+														<span className="text-sm mt-1">Submit change requests for service modifications</span>
+													</div>
+												</td>
+											</tr>
+										)
+									)}
+									{activeTab === 'Users' && (
+										paginatedData.length > 0 ? (
+											paginatedData.map((u) => {
+												if (!u || !u._id) {
+													console.warn('⚠️ Invalid user row:', u);
+													return null;
+												}
+												return (
+													<tr key={u._id}>
+														<td>{u.name || 'Unknown user'}</td>
+														<td>{u.email || 'No email'}</td>
+														<td>{u.role || 'No role assigned'}</td>
+														<td>{u.createdAt ? new Date(u.createdAt).toLocaleString() : 'N/A'}</td>
+													</tr>
+												);
+											}).filter(Boolean)
+										) : (
+											<tr>
+												<td colSpan="4" className="text-center py-8 text-gray-500">
+													<div className="flex flex-col items-center">
+														<Users className="w-8 h-8 text-gray-400 mb-2" />
+														<span>No users found</span>
+														<span className="text-sm mt-1">Add users to the system</span>
+													</div>
+												</td>
+											</tr>
+										)
+									)}
 										</tbody>
 									</table>
 								</div>
