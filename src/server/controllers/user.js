@@ -43,7 +43,7 @@ export const updateUser = async (req, res) => {
     }
 
     const updates = Object.keys(req.body);
-    const allowedUpdates = ['name', 'email', 'password', 'age']; // Add your user fields here
+    const allowedUpdates = ['name', 'email', 'password', 'role']; // Add your user fields here
     const isValidOperation = updates.every((update) => allowedUpdates.includes(update));
 
     if (!isValidOperation) {
