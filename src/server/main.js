@@ -15,6 +15,7 @@ import { setIo } from './socket.js';
 import customerRoutes from "./routes/customer.js";
 import cors from "cors";
 import chatRoutes from "./routes/chatBot.js";
+import requestChangeRoutes from './routes/requestChange.js';
 
 
 dotenv.config();
@@ -77,6 +78,7 @@ app.use('/api/support-ticket', supportTicketRoutes);
 
 
 app.use('/api/chat', chatRoutes);
+app.use('/api/request-change', requestChangeRoutes);
 
 
 // Error handling middleware
