@@ -17,7 +17,7 @@ const SessionList = ({ sessions, selectedSessionId, onSelect, onDelete }) => {
                     <li id="item" key={s._id} className={`session-item ${selectedSessionId === s._id ? 'active' : ''}`} onClick={() => onSelect(s)}>
                         <div className="session-details">
                             <div id="session-title" className="title">{s.sessionTitle}</div>
-                            <div className={`status badge status-${s.status}`}>{s.status}</div>
+                            <div id="statuss" className={`status badge status-${s.status}`}>{s.status}</div>
                             <div id="date" className="meta">{new Date(s.updatedAt).toLocaleString()}</div>
                         </div>
                         {/* --- MODIFIED: Changed icon and title --- */}
