@@ -204,7 +204,4 @@ process.on('SIGTERM', async () => {
   }
   
   process.exit(0);
-const PORT = process.env.PORT || 3000;
-server.listen(PORT, () => {
-  console.log(`Server + WebSocket running on port ${PORT}`);
 });
