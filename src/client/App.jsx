@@ -9,12 +9,12 @@ import ITDashboard from "./pages/IT";
 import Adminview from "./pages/adminview/adminview";
 import ChatBot from "./pages/chatBot/index.jsx";
 import Support from "./pages/Support/index.jsx";
-import MqttLiveDashboard from "./pages/IT/index.jsx";
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/support" element={<Support />} />
+        {/* Home route should render the marketing Home page */}
         <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
         <Route path="/signup" element={<Signup />} />
