@@ -70,7 +70,8 @@ export const addIotReading = async (req, res) => {
       getIo().emit('new-alert', {
         alert: alert,
         timestamp: new Date().toISOString(),
-        type: 'new-alert'
+        eventType: 'new-alert',
+        type: alert.type
       });
     }
 
@@ -85,7 +86,8 @@ export const addIotReading = async (req, res) => {
       getIo().emit('new-alert', {
         alert: alert2,
         timestamp: new Date().toISOString(),
-        type: 'new-alert'
+        eventType: 'new-alert',
+        type: alert2.type
       });
     }
 
@@ -100,7 +102,8 @@ export const addIotReading = async (req, res) => {
       getIo().emit('new-alert', {
         alert: alert3,
         timestamp: new Date().toISOString(),
-        type: 'new-alert'
+        eventType: 'new-alert',
+        type: alert3.type
       });
     }
     if (smokelevel === 1) {
@@ -114,7 +117,8 @@ export const addIotReading = async (req, res) => {
       getIo().emit('new-alert', {
         alert: alert4,
         timestamp: new Date().toISOString(),
-        type: 'new-alert'
+        eventType: 'new-alert',
+        type: alert4.type
       });
     }
 
