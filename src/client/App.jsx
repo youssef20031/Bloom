@@ -9,13 +9,13 @@ import ITDashboard from "./pages/IT";
 import Adminview from "./pages/adminview/adminview";
 import ChatBot from "./pages/chatBot/index.jsx";
 import Support from "./pages/Support/index.jsx";
-
+import MqttLiveDashboard from "./pages/IT/index.jsx";
 function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/support" element={<Support />} />
-        <Route path="/" element={<Home />} />
+        <Route path="/" element={<MqttLiveDashboard />} />
         <Route path="/services" element={<Services />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
