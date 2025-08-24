@@ -208,7 +208,7 @@ export default function CustomerView({ initialSection = 'overview' }) {
                             const cid = typeof inv.customerId === 'string' ? inv.customerId : inv.customerId?._id;
                             return cid === userId;
                         }).map(inv => ({ id: inv._id, date: inv.issueDate, amount: inv.amount, status: inv.status }));
-                        setInvoices(filtered);
+                         setInvoices(filtered);
                     }).catch(()=>{ setInvoiceError('Failed to load invoices'); });
                 }
             }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './support.css';
-import { listSupportTickets, getSupportTicket, updateTicketStatus } from '../../api/supportApi';
+import { listSupportTickets, getSupportTicket, updateTicketStatus, submitChangeRequest } from '../../api/supportApi';
 
 export default function App() {
     const [tickets, setTickets] = useState([]);
@@ -15,6 +15,14 @@ export default function App() {
     const [showDetailsModal, setShowDetailsModal] = useState(false);
     const [detailsLoading, setDetailsLoading] = useState(false);
     const [detailsError, setDetailsError] = useState(null);
+
+    // Add state for change request modal and form fields
+    const [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
+    const [changeRequestTag, setChangeRequestTag] = useState('');
+    const [changeRequestDescription, setChangeRequestDescription] = useState('');
+    const [changeRequestError, setChangeRequestError] = useState('');
+    const [changeRequestLoading, setChangeRequestLoading] = useState(false);
+    const [changeRequestSuccess, setChangeRequestSuccess] = useState('');
 
     useEffect(() => {
         // Fetch all support tickets from the database
@@ -118,6 +126,31 @@ export default function App() {
         { value: 'in_progress', label: 'In Progress', color: '#17a2b8' },
         { value: 'closed', label: 'Closed', color: '#dc3545' }
     ];
+
+    // Handler for sending change request
+    const handleSendChangeRequest = async () => {
+        if (!changeRequestTag) {
+            setChangeRequestError('Tag is required.');
+            return;
+        }
+        setChangeRequestLoading(true);
+        setChangeRequestError('');
+        setChangeRequestSuccess('');
+        try {
+            // Use a valid user ID from your database here
+            await submitChangeRequest(ticketDetails._id, changeRequestTag.toLowerCase(), changeRequestDescription, '64e7b2f8c2a1e2d4f8a12345');
+            setChangeRequestSuccess('Change request sent successfully!');
+            // Refresh ticket details to show new message
+            const updatedDetails = await getSupportTicket(ticketDetails._id);
+            setTicketDetails(updatedDetails);
+            setShowChangeRequestModal(false);
+            setChangeRequestTag('');
+            setChangeRequestDescription('');
+        } catch (err) {
+            setChangeRequestError(err.message || 'Failed to send change request');
+        }
+        setChangeRequestLoading(false);
+    };
 
     return (
         <div className="app">
@@ -303,6 +336,50 @@ export default function App() {
                                         ))}
                                     </div>
                                 </div>
+                                {/* Add Change Request button for Open tickets */}
+                                {ticketDetails.status === 'in_progress' && (
+                                    <button
+                                        style={{marginTop:'1rem',padding:'8px 20px',borderRadius:'8px',background:'#6366f1',color:'#fff',fontWeight:'bold',border:'none',cursor:'pointer'}}
+                                        onClick={() => {
+                                            setChangeRequestTag('');
+                                            setChangeRequestDescription('');
+                                            setShowChangeRequestModal(true);
+                                        }}
+                                    >
+                                        Change Request
+                                    </button>
+                                )}
+                                {/* Change Request Modal */}
+                                {showChangeRequestModal && (
+                                    <div className="modal-overlay" style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:1100}}>
+                                        <div className="modal-content" style={{background:'#fff',padding:'2rem',borderRadius:'8px',maxWidth:'400px',margin:'10% auto',position:'relative'}}>
+                                            <button style={{position:'absolute',top:'1rem',right:'1rem',fontSize:'1.5rem',background:'none',border:'none',cursor:'pointer'}} onClick={()=>setShowChangeRequestModal(false)}>&times;</button>
+                                            <h3>Submit Change Request</h3>
+                                            <div style={{margin:'1rem 0'}}>
+                                                <label htmlFor="tag-select"><strong>Tag <span style={{color:'red'}}>*</span>:</strong></label>
+                                                <select id="tag-select" value={changeRequestTag} onChange={e=>setChangeRequestTag(e.target.value)} style={{width:'100%',padding:'8px',marginTop:'0.5rem',borderRadius:'6px',fontWeight:'bold',background:changeRequestTag==='AI'?'#e0f7fa':changeRequestTag==='DC'?'#f3e8ff':'#f8fafc',color:'#333',border:'2px solid #6366f1'}} required>
+                                                    <option value="" style={{background:'#f8fafc',color:'#333'}}>Select Tag</option>
+                                                    <option value="AI" style={{background:'#e0f7fa',color:'#00796b'}}>AI</option>
+                                                    <option value="DC" style={{background:'#f3e8ff',color:'#6d28d9'}}>DC</option>
+                                                </select>
+                                            </div>
+                                            <div style={{margin:'1rem 0'}}>
+                                                <label htmlFor="desc-text"><strong>Description (optional):</strong></label>
+                                                <textarea id="desc-text" value={changeRequestDescription} onChange={e=>setChangeRequestDescription(e.target.value)} style={{width:'100%',padding:'8px',marginTop:'0.5rem',minHeight:'60px',borderRadius:'6px',background:'#f8fafc',border:'2px solid #6366f1',color:'#333',fontSize:'15px'}} placeholder="Describe your change request..." />
+                                            </div>
+                                            {changeRequestLoading && <div style={{color:'#6366f1',marginBottom:'1rem'}}>Sending...</div>}
+                                            {changeRequestError && <div style={{color:'red',marginBottom:'1rem'}}>{changeRequestError}</div>}
+                                            {changeRequestSuccess && <div style={{color:'#16a34a',marginBottom:'1rem'}}>{changeRequestSuccess}</div>}
+                                            <button
+                                                style={{padding:'8px 20px',borderRadius:'8px',background:'#16a34a',color:'#fff',fontWeight:'bold',border:'none',cursor:'pointer'}}
+                                                onClick={handleSendChangeRequest}
+                                                disabled={changeRequestLoading}
+                                            >
+                                                Send Change Request
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
                                 <div>
                                     <h3>History</h3>
                                     <ul>

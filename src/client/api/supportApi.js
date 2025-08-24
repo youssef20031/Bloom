@@ -23,11 +23,11 @@ export async function getSupportTicket(ticketId) {
   return res.json();
 }
 
-export async function addTicketMessage(ticketId, message) {
+export async function addTicketMessage(ticketId, message, authorId) {
   const res = await fetch(`${BASE_URL}/${ticketId}/message`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ message })
+    body: JSON.stringify({ message, authorId })
   });
   if (!res.ok) throw new Error('Failed to add message');
   return res.json();
@@ -59,4 +59,9 @@ export async function deleteSupportTicket(ticketId) {
   });
   if (!res.ok) throw new Error('Failed to delete ticket');
   return res.json();
+}
+
+export async function submitChangeRequest(ticketId, tag, description, authorId) {
+  const message = `[Change Request]\nTag: ${tag}\nDescription: ${description || 'N/A'}`;
+  return addTicketMessage(ticketId, message, authorId);
 }
