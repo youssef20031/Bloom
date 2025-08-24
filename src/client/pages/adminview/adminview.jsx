@@ -1699,7 +1699,6 @@ export default function Dashboard() {
                     } catch (err) {
                         console.error(err);
                         alert("Failed to reject request");
-
                     }
                 }}
             >
