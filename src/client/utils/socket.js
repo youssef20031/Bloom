@@ -13,7 +13,7 @@ class SocketService {
     }
 
     // Connect to backend WebSocket with retry logic
-    this.socket = io("http://localhost:3000", {
+    this.socket = io("/", {
       transports: ["websocket", "polling"], // Allow fallback to polling
       forceNew: false, // Allow reusing existing connection
       reconnection: true,
@@ -115,4 +115,3 @@ class SocketService {
 const socketService = new SocketService();
 
 export default socketService;
-
