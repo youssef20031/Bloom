@@ -1,5 +1,6 @@
 import axios from 'axios';
 import ChatSession from '../models/chatSession.js';
+import Customer from '../models/customer.js'; 
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL || 'http://localhost:5001';
 
@@ -9,9 +10,12 @@ const formatHistoryForAI = (messages) => {
     return messages.map((m) => [m.sender, m.content]);
 };
 
+// --- MODIFIED: This entire function is updated to handle dynamic filenames ---
 const getHistoryAndRespond = async (req, res, endpoint) => {
     try {
         const { sessionId } = req.body;
+        console.log(`[Report Gen] Received request for session ID: ${sessionId}`); // <-- DEBUG LOG 1
+
         if (!sessionId) {
             return res.status(400).send('sessionId is required.');
         }
@@ -20,26 +24,56 @@ const getHistoryAndRespond = async (req, res, endpoint) => {
         if (!session) {
             return res.status(404).send('Session not found.');
         }
+        
+        // <-- DEBUG LOG 2: Check the session object itself
+        console.log('[Report Gen] Found session object:', JSON.stringify(session, null, 2)); 
+
+        let customerName = 'General';
+        if (session.customerId) {
+            console.log(`[Report Gen] Session has customerId: ${session.customerId}. Looking up customer...`); // <-- DEBUG LOG 3
+            const customer = await Customer.findById(session.customerId);
+            if (customer) {
+                console.log(`[Report Gen] Found customer: ${customer.companyName}`); // <-- DEBUG LOG 4
+                customerName = customer.companyName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+            } else {
+                console.log(`[Report Gen] Customer with ID ${session.customerId} NOT FOUND in database.`); // <-- DEBUG LOG 5
+            }
+        } else {
+            console.log('[Report Gen] Session has no customerId. Using default name.'); // <-- DEBUG LOG 6
+        }
+
+        const dateStr = new Date().toISOString().split('T')[0];
+        const extension = endpoint.includes('docx') ? 'docx' : 'pdf';
+        const filename = `presales_report_${customerName}_${dateStr}.${extension}`;
+
+        console.log(`[Report Gen] Final filename will be: ${filename}`); // <-- DEBUG LOG 7
 
         const transformedHistory = formatHistoryForAI(session.messages);
+
+        // --- EDITED SECTION START ---
+        // This is the fix for the "Invalid URL" error.
+        // We use the same robust URL construction as in your `chat` function.
         const aiResponse = await axios.post(
-            `${AI_SERVICE_URL}/${endpoint}`,
+            `${process.env.AI_SERVICE_URL || 'http://localhost:5001'}/${endpoint}`,
             { chat_history: transformedHistory },
             { responseType: 'stream' }
         );
 
+        // Set headers for the file download
         if (aiResponse.headers['content-type']) {
             res.setHeader('Content-Type', aiResponse.headers['content-type']);
         }
-        if (aiResponse.headers['content-disposition']) {
-            res.setHeader('Content-Disposition', aiResponse.headers['content-disposition']);
-        }
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
         aiResponse.data.pipe(res);
+        // --- EDITED SECTION END ---
+
     } catch (error) {
         console.error(`Error in ${endpoint}:`, error);
         res.status(500).send(`Error generating ${endpoint}.`);
     }
 };
+
 
 
 // --- Chat & Report Controllers ---
@@ -170,7 +204,7 @@ export const getSessions = async (req, res) => {
 
 export const getSessionById = async (req, res) => {
     try {
-        const session = await ChatSession.findById(req.params.id);
+        const session = await ChatSession.findById(req.params.id).populate('customerId', 'companyName');
         if (!session) return res.status(404).json({ error: 'Not found' });
         res.json(session);
     } catch (e) {

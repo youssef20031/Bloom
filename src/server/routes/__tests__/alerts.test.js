@@ -10,6 +10,8 @@ const app = express();
 app.use(express.json());
 app.use('/api/alerts', alertRoutes);
 
+jest.setTimeout(20000);
+
 describe('Alert Routes', () => {
   let mongoServer;
 

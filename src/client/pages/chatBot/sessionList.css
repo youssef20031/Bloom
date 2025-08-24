@@ -1,8 +1,8 @@
 #date{
-    color: #D5EAFF;
+    color: #464a4f ;
 }
 #header{
-    color: white;
+    color: #464a4f;
 }
 
 /* --- MODIFIED: Use flexbox and set relative positioning --- */
@@ -12,10 +12,11 @@
     padding-right: 35px; /* Add padding to prevent text from overlapping the button */
 }
 #session-title{
-    color: white;
+    color: #464a4f;
 }
+
 .session-list #item:hover{
-    background-color: #c7d8f0;
+    background-color: #e9edf5;
     border-color: #e5e7eb;
     #date{
         color: #464a4f ;
@@ -26,7 +27,7 @@
 }
 
 .chatbot-wrapper .session-item.active {
-    background:#c7d8f0; border-color: #e5e7eb;
+    background:#e9edf5; border-color: #e5e7eb;
     #date{
         color: #464a4f ;
     }
@@ -68,7 +69,12 @@
     color: #1f2937;
 }
 
-
+#statuss{
+    background-color: #d8e1f0;
+    border-color: #7488a8;
+    color: #1E3A61;
+    border-style: solid;
+}
 /* Div to wrap the text content */
 .session-details {
     display: flex;

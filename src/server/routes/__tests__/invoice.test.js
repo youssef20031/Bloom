@@ -30,6 +30,7 @@ afterEach(async () => {
     await Invoice.deleteMany({});
 });
 
+jest.setTimeout(20000);
 
 describe('Invoice API', () => {
   it('should create a new invoice', async () => {

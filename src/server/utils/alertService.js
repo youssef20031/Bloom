@@ -33,7 +33,8 @@ class AlertService {
       io.emit('new-alert', {
         alert: newAlert,
         timestamp: new Date().toISOString(),
-        type: 'new-alert'
+        eventType: 'new-alert',
+        type: newAlert.type
       });
       
       // Also emit to IT dashboard room specifically
@@ -41,7 +42,8 @@ class AlertService {
       io.to('it-dashboard').emit('it-alert', {
         alert: newAlert,
         timestamp: new Date().toISOString(),
-        type: 'new-alert'
+        eventType: 'new-alert',
+        type: newAlert.type
       });
       
       console.log('✅ Alert emission completed');
@@ -77,7 +79,8 @@ class AlertService {
       io.emit('alert-update', {
         alert: updatedAlert,
         timestamp: new Date().toISOString(),
-        type: 'alert-update'
+        eventType: 'alert-update',
+        type: updatedAlert.type
       });
       
       return updatedAlert;
@@ -112,7 +115,8 @@ class AlertService {
       io.emit('alert-resolved', {
         alert: resolvedAlert,
         timestamp: new Date().toISOString(),
-        type: 'alert-resolved'
+        eventType: 'alert-resolved',
+        type: resolvedAlert.type
       });
       
       return resolvedAlert;
@@ -163,4 +167,3 @@ class AlertService {
 }
 
 export default AlertService;
-

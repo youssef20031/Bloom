@@ -47,7 +47,7 @@ export default function Dashboard() {
     const [selected, setSelected] = useState(null);
     const [pageSize, setPageSize] = useState(5);
     const [page, setPage] = useState(1);
-    const [modalType, setModalType] = useState(null); // "details" | "employee" | "product" | "dc" | "service" | null
+    const [modalType, setModalType] = useState(null); // "details" | "employee" | "product" | "dc" | "service" | "Request" | null
     const [newEmployee, setNewEmployee] = useState({
         name: "",
         email: "",
@@ -179,6 +179,12 @@ export default function Dashboard() {
                         setEntities(res.data || []);
                         setProducts(prodRes.data || []);
                         setCustomers(custRes.data || []);
+                    }
+                }
+                if (currentView == "Request") {
+                    const res = await api.get("/request-change");
+                    if (mounted) {
+                        setEntities(res.data || []);
                     }
                 }
                 // Later: add Product, Service, DC fetches here
@@ -424,7 +430,7 @@ export default function Dashboard() {
                 {/* Entity Filters */}
                 <div className="entity-filters">
                     <div className="tab-buttons">
-                        {["Customer", "Employee", "DC", "Product", "Service"].map((view) => (
+                        {["Customer", "Employee", "DC", "Product", "Service", "Request"].map((view) => (
                             <button
                                 key={view}
                                 className={`tab-button ${currentView === view ? "active" : ""}`}
@@ -445,7 +451,7 @@ export default function Dashboard() {
                         setModalType(currentView.toLowerCase()); // "employee", "product", "dc", "service"
 
                     }}
-                        disabled={currentView === "Customer"}
+                        disabled={currentView === "Customer" || currentView === "Request"}
                     >Add +</button>
                 </div>
 
@@ -1056,6 +1062,118 @@ export default function Dashboard() {
                         )}
                     </div>
                 )}
+                {currentView === "Request" && (
+                    <div className="table-container">
+                        <div className="table-wrapper">
+                            <table className="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Ticket Issue</th>
+                                        <th>Tag</th>
+                                        <th>Description</th>
+                                        <th>Status</th>
+                                        <th>Created At</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loading && (
+                                        <tr>
+                                            <td colSpan={6} className="loading">Loading...</td>
+                                        </tr>
+                                    )}
+                                    {error && !loading && (
+                                        <tr>
+                                            <td colSpan={6} className="error">{error}</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.length === 0 && (
+                                        <tr>
+                                            <td colSpan={6} className="empty">No requests found.</td>
+                                        </tr>
+                                    )}
+                                    {!loading && !error && pageItems.map((req) => (
+                                        <tr
+                                            key={req._id}
+                                            onClick={() => {
+                                                setSelected(req);
+                                                setModalType("details");
+                                            }}
+                                            className="table-row"
+                                        >
+                                            <td>{req.supportTicketId?.issue || "N/A"}</td>
+                                            <td>{req.tag}</td>
+                                            <td>{req.description || "N/A"}</td>
+                                            <td>{req.status}</td>
+                                            <td>{new Date(req.createdAt).toLocaleDateString()}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        {/* Pagination same as Service */}
+                        {!loading && !error && entities.length > 0 && (
+                            <div className="pagination-container">
+                                <div className="pagination-info">
+                                    <span>Show</span>
+                                    <select
+                                        value={pageSize}
+                                        onChange={(e) => {
+                                            setPageSize(Number(e.target.value));
+                                            setPage(1);
+                                        }}
+                                        className="page-size-select"
+                                    >
+                                        {[3, 5, 10, 20].map((n) => (
+                                            <option key={n} value={n}>
+                                                {n}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <span>Row</span>
+                                </div>
+                                <div className="pagination">
+                                    <button
+                                        onClick={() => setPage(Math.max(1, page - 1))}
+                                        disabled={page === 1}
+                                        className="page-btn"
+                                    >
+                                        {"<"}
+                                    </button>
+                                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                                        .slice(0, 5)
+                                        .map((n) => (
+                                            <button
+                                                key={n}
+                                                onClick={() => setPage(n)}
+                                                className={`page-btn ${n === page ? "active" : ""}`}
+                                            >
+                                                {n}
+                                            </button>
+                                        ))}
+                                    {totalPages > 5 && (
+                                        <>
+                                            <span className="page-dots">...</span>
+                                            <button
+                                                onClick={() => setPage(totalPages)}
+                                                className="page-btn"
+                                            >
+                                                {totalPages}
+                                            </button>
+                                        </>
+                                    )}
+                                    <button
+                                        onClick={() => setPage(Math.min(totalPages, page + 1))}
+                                        disabled={page === totalPages}
+                                        className="page-btn"
+                                    >
+                                        {">"}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
 
             </div>
 
@@ -1530,6 +1648,80 @@ export default function Dashboard() {
 
                     </div>
                 )}
+{modalType === "details" && currentView === "Request" && selected && (
+  <div className="modal-content">
+    <div className="info-row"><b>Ticket Issue:</b> {selected.supportTicketId?.issue || "—"}</div>
+    <div className="info-row"><b>Ticket Type:</b> {selected.supportTicketId?.type || "—"}</div>
+    <div className="info-row"><b>Tag:</b> {selected.tag}</div>
+    <div className="info-row"><b>Description:</b> {selected.description || "—"}</div>
+    <div className="info-row"><b>Status:</b> {selected.status}</div>
+    <div className="info-row"><b>Created At:</b> {new Date(selected.createdAt).toLocaleString()}</div>
+
+    {selected.status === "pending" && (
+      <div className="modal-actions">
+        {/* ✅ Approve */}
+        <button
+          onClick={async () => {
+            try {
+              const res = await fetch(`/api/request-change/${selected._id}/status`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "approved" }),
+              });
+
+              if (!res.ok) throw new Error("Failed to approve request");
+              const data = await res.json();
+
+              // ✅ update entities with new status
+              setEntities((prev) =>
+                prev.map((e) => (e._id === selected._id ? data.change : e))
+              );
+
+              setSelected(null);
+              setModalType(null);
+            } catch (err) {
+              console.error(err);
+              alert("Failed to approve request");
+            }
+          }}
+        >
+          ✅ Approve
+        </button>
+
+        {/* ❌ Not Approve */}
+        <button
+          className="danger-btn"
+          onClick={async () => {
+            try {
+              const res = await fetch(`/api/request-change/${selected._id}/status`, {
+                method: "PUT",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status: "not_approved" }),
+              });
+
+              if (!res.ok) throw new Error("Failed to reject request");
+              const data = await res.json();
+
+              // ✅ update entities with new status
+              setEntities((prev) =>
+                prev.map((e) => (e._id === selected._id ? data.change : e))
+              );
+
+              setSelected(null);
+              setModalType(null);
+            } catch (err) {
+              console.error(err);
+              alert("Failed to reject request");
+            }
+          }}
+        >
+          ❌ Not Approve
+        </button>
+      </div>
+    )}
+  </div>
+)}
+
 
                 {/* EMPLOYEE ADD MODAL (example) */}
                 {modalType === "employee" && (
@@ -1917,7 +2109,7 @@ export default function Dashboard() {
                                         setNewService({ ...newService, associatedProducts: updated });
                                     }}
                                 />
-                                
+
                                 <button
                                     type="button"
                                     onClick={() => {
@@ -1936,21 +2128,21 @@ export default function Dashboard() {
                                 )}
                             </div>
                         ))}
-                         <div className="modal-actions">
-                        <button
-                            type="button"
-                            onClick={() =>
-                                setNewService({
-                                    ...newService,
-                                    associatedProducts: [
-                                        ...(newService.associatedProducts || []),
-                                        { productId: "", quantity: 1 },
-                                    ],
-                                })
-                            }
-                        >
-                            + Add Product
-                        </button>
+                        <div className="modal-actions">
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    setNewService({
+                                        ...newService,
+                                        associatedProducts: [
+                                            ...(newService.associatedProducts || []),
+                                            { productId: "", quantity: 1 },
+                                        ],
+                                    })
+                                }
+                            >
+                                + Add Product
+                            </button>
                         </div>
                         {/* Datacenter Location */}
                         <div className="form-field">

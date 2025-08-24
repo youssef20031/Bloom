@@ -7,7 +7,7 @@ import "./chatBot.css";
 import ChatWindow from './ChatWindow.jsx';
 import ChatInput from './ChatInput.jsx';
 import SessionList from './SessionList.jsx';
-import Modal from './Modal.jsx'; 
+import Modal from './Modal.jsx';
 
 export default function ChatBot() {
     const [messages, setMessages] = useState([
@@ -19,15 +19,33 @@ export default function ChatBot() {
     const [isLoading, setIsLoading] = useState(false);
     const [sessions, setSessions] = useState([]);
     const [selectedSession, setSelectedSession] = useState(null);
-    const user= localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
+    const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
+    
+    // --- MODIFIED: More generic API base for easier use ---
     const API_BASE = '/api/chat';
-    const PRESALES_USER_ID = user._id || undefined;
+    const PRESALES_USER_ID = user?._id || undefined;
+    
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [sessionToDelete, setSessionToDelete] = useState(null);
 
+    // --- NEW: State for customer dropdown ---
+    const [customers, setCustomers] = useState([]);
+    const [selectedCustomerId, setSelectedCustomerId] = useState('');
+
     useEffect(() => {
         fetchSessions();
+        fetchCustomers(); // --- NEW: Fetch customers on initial load
     }, []);
+
+    // --- NEW: Function to fetch the list of customers ---
+    const fetchCustomers = async () => {
+        try {
+            const { data } = await axios.get(`/api/customers`);
+            setCustomers(data);
+        } catch (e) {
+            console.error('Failed to load customers', e);
+        }
+    };
 
     const fetchSessions = async () => {
         try {
@@ -41,6 +59,7 @@ export default function ChatBot() {
 
     const handleNewSession = () => {
         setSelectedSession(null);
+        // Do NOT reset selectedCustomerId, so user can pick a customer *before* starting
         setMessages([
             { sender: 'bot', text: "New session started. How can I help?" }
         ]);
@@ -51,14 +70,22 @@ export default function ChatBot() {
     const handleSelectSession = async (session) => {
         setSelectedSession(session);
         setShowReport(false);
+        
         try {
+            // This axios call now returns the populated customer data
             const { data } = await axios.get(`${API_BASE}/sessions/${session._id}`);
+    
+            // --- MODIFIED LOGIC ---
+            // If the session has a customerId object, set the dropdown to its _id.
+            // Otherwise, reset it to empty.
+            setSelectedCustomerId(data.customerId?._id || '');
+    
             const mappedMessages = data.messages.map(m => ({
                 sender: m.sender === 'human' ? 'user' : 'bot',
                 text: m.content
             }));
             setMessages([
-                { sender: 'bot', text: `Session "${data.sessionTitle}" loaded. Continue your conversation.` },
+                { sender: 'bot', text: `Session "${data.sessionTitle || 'Untitled'}" loaded. Continue your conversation.` },
                 ...mappedMessages
             ]);
         } catch (e)
@@ -71,19 +98,28 @@ export default function ChatBot() {
     const handleSend = async () => {
         if (input.trim() === '' || isLoading) return;
 
+        // --- NEW: Prevent starting a new session without a customer selected ---
+        if (!selectedSession && !selectedCustomerId) {
+            alert("Please select a customer before starting a new session.");
+            return;
+        }
+
         const userMessage = { sender: 'user', text: input };
         setMessages(prev => [...prev, userMessage]);
         setInput('');
         setIsLoading(true);
 
         try {
+            // --- MODIFIED: Switched to fetch for streaming ---
             const response = await fetch(`${API_BASE}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     input,
                     sessionId: selectedSession?._id,
-                    presalesUserId: PRESALES_USER_ID
+                    presalesUserId: PRESALES_USER_ID,
+                    // --- MODIFIED: Pass customerId ONLY for new sessions ---
+                    customerId: !selectedSession ? selectedCustomerId : undefined,
                 })
             });
 
@@ -91,8 +127,11 @@ export default function ChatBot() {
 
             const newSessionId = response.headers.get('X-Session-Id');
             if (newSessionId && !selectedSession) {
-                setSelectedSession({ _id: newSessionId, status: 'active' });
-                fetchSessions();
+                // When a new session is created, re-fetch to get the full session object
+                await fetchSessions(); 
+                // Find the new session from the list and set it as selected
+                const newlyCreatedSession = sessions.find(s => s._id === newSessionId) || { _id: newSessionId, status: 'active' };
+                setSelectedSession(newlyCreatedSession);
             }
 
             let botMessage = { sender: 'bot', text: '' };
@@ -106,6 +145,7 @@ export default function ChatBot() {
                 const chunk = decoder.decode(value, { stream: true });
                 setMessages(prev => {
                     const lastMsgIndex = prev.length - 1;
+                    if (lastMsgIndex < 0) return prev; // Safety check
                     const newMessages = [...prev];
                     newMessages[lastMsgIndex] = { ...newMessages[lastMsgIndex], text: newMessages[lastMsgIndex].text + chunk };
                     return newMessages;
@@ -131,7 +171,10 @@ export default function ChatBot() {
             });
             setReportContent(response.data);
             setShowReport(true);
-            await downloadFile('report_pdf', `presales_report_${selectedSession._id}.pdf`);
+            
+            // The second argument is no longer needed!
+            await downloadFile('report_pdf'); 
+            
             fetchSessions();
         } catch (error) {
             console.error('Report API error:', error);
@@ -142,19 +185,34 @@ export default function ChatBot() {
         }
     };
 
-    const downloadFile = async (endpoint, filename) => {
+    const downloadFile = async (endpoint) => {
         if (!selectedSession) return;
         try {
             const response = await axios.post(`${API_BASE}/${endpoint}`,
                 { sessionId: selectedSession._id },
                 { responseType: 'blob' }
             );
+    
             if (response.status !== 200) throw new Error('Download failed');
+            
+            // --- NEW LOGIC TO PARSE FILENAME FROM HEADER ---
+            let filename = `presales_report_${selectedSession._id}.pdf`; // A fallback filename
+            const disposition = response.headers['content-disposition'];
+    
+            if (disposition && disposition.indexOf('attachment') !== -1) {
+                const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                const matches = filenameRegex.exec(disposition);
+                if (matches != null && matches[1]) { 
+                    filename = matches[1].replace(/['"]/g, '');
+                }
+            }
+            // --- END OF NEW LOGIC ---
+    
             const blob = response.data;
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = filename;
+            a.download = filename; // Use the filename from the server (or the fallback)
             document.body.appendChild(a);
             a.click();
             a.remove();
@@ -170,19 +228,15 @@ export default function ChatBot() {
         setIsModalOpen(true);
     };
 
-    // --- NEW: Function to close the modal ---
     const handleCancelDelete = () => {
         setIsModalOpen(false);
         setSessionToDelete(null);
     };
 
-    // --- NEW: Function to run when deletion is confirmed ---
     const handleConfirmDelete = async () => {
         if (!sessionToDelete) return;
-
         try {
             await axios.delete(`${API_BASE}/sessions/${sessionToDelete}`);
-
             if (selectedSession?._id === sessionToDelete) {
                 handleNewSession();
             }
@@ -191,7 +245,6 @@ export default function ChatBot() {
             console.error('Failed to delete session', error);
             alert('Could not delete the session. Please try again.');
         } finally {
-            // Close the modal and reset the state
             setIsModalOpen(false);
             setSessionToDelete(null);
         }
@@ -202,20 +255,37 @@ export default function ChatBot() {
             <div className="app-container">
                 <div className="sidebar">
                     <button className="session-button" onClick={handleNewSession}>+ New Session</button>
-                    <SessionList 
-                        sessions={sessions} 
-                        selectedSessionId={selectedSession?._id} 
-                        onSelect={handleSelectSession} 
+                    <SessionList
+                        sessions={sessions}
+                        selectedSessionId={selectedSession?._id}
+                        onSelect={handleSelectSession}
                         onDelete={handleDeleteSession}
                     />
                 </div>
-                
+
                 <main className="main-content-area">
                     {/* Chat view */}
                     <div className={`content ${showReport ? 'hidden' : ''}`}>
+                        {/* --- MODIFIED HEADER TO INCLUDE DROPDOWN --- */}
                         <header className="app-header">
                             <h1>Dell Presales Technical Assistant</h1>
-                            {selectedSession && <div className={`badge status-${selectedSession.status || 'active'}`}>{selectedSession.status || 'active'}</div>}
+                            <div className="header-controls">
+                                <select
+                                    className="customer-select"
+                                    value={selectedCustomerId}
+                                    onChange={(e) => setSelectedCustomerId(e.target.value)}
+                                    disabled={!!selectedSession} // Disable if a session is loaded
+                                    title={selectedSession ? "Start a new session to select a different customer" : "Select a customer"}
+                                >
+                                    <option value="">-- Select Customer --</option>
+                                    {customers.map(customer => (
+                                        <option key={customer._id} value={customer._id}>
+                                            {customer.companyName}
+                                        </option>
+                                    ))}
+                                </select>
+                                {selectedSession && <div id="status-header" className={`badge status-${selectedSession.status || 'active'}`}>{selectedSession.status || 'active'}</div>}
+                            </div>
                         </header>
                         <ChatWindow messages={messages} isLoading={isLoading} />
                         <ChatInput input={input} setInput={setInput} onSend={handleSend} onEnd={handleExit} disabled={isLoading} />
