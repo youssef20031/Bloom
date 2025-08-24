@@ -15,7 +15,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/support" element={<Support />} />
-        <Route path="/" element={<MqttLiveDashboard />} />
+        <Route path="/" element={<Home />} />
         <Route path="/services" element={<Services />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />

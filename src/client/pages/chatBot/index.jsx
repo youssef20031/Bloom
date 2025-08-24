@@ -22,7 +22,7 @@ export default function ChatBot() {
     const user = localStorage.getItem('user') ? JSON.parse(localStorage.getItem('user')) : null;
     
     // --- MODIFIED: More generic API base for easier use ---
-    const API_BASE = 'http://localhost:3000/api';
+    const API_BASE = '/api/chat';
     const PRESALES_USER_ID = user?._id || undefined;
     
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -40,7 +40,7 @@ export default function ChatBot() {
     // --- NEW: Function to fetch the list of customers ---
     const fetchCustomers = async () => {
         try {
-            const { data } = await axios.get(`${API_BASE}/customers`);
+            const { data } = await axios.get(`/api/customers`);
             setCustomers(data);
         } catch (e) {
             console.error('Failed to load customers', e);
@@ -50,7 +50,7 @@ export default function ChatBot() {
     const fetchSessions = async () => {
         try {
             const params = PRESALES_USER_ID ? { presalesUserId: PRESALES_USER_ID } : {};
-            const { data } = await axios.get(`${API_BASE}/chat/sessions`, { params });
+            const { data } = await axios.get(`${API_BASE}/sessions`, { params });
             setSessions(data);
         } catch (e) {
             console.error('Failed to load sessions', e);
@@ -73,7 +73,7 @@ export default function ChatBot() {
         
         try {
             // This axios call now returns the populated customer data
-            const { data } = await axios.get(`${API_BASE}/chat/sessions/${session._id}`);
+            const { data } = await axios.get(`${API_BASE}/sessions/${session._id}`);
     
             // --- MODIFIED LOGIC ---
             // If the session has a customerId object, set the dropdown to its _id.
@@ -111,7 +111,7 @@ export default function ChatBot() {
 
         try {
             // --- MODIFIED: Switched to fetch for streaming ---
-            const response = await fetch(`${API_BASE}/chat/chat`, {
+            const response = await fetch(`${API_BASE}/chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -165,7 +165,7 @@ export default function ChatBot() {
         if (!selectedSession) return;
         setIsLoading(true);
         try {
-            const response = await axios.post(`${API_BASE}/chat/report`, {
+            const response = await axios.post(`${API_BASE}/report`, {
                 sessionId: selectedSession._id,
                 complete: true
             });
@@ -188,7 +188,7 @@ export default function ChatBot() {
     const downloadFile = async (endpoint) => {
         if (!selectedSession) return;
         try {
-            const response = await axios.post(`${API_BASE}/chat/${endpoint}`,
+            const response = await axios.post(`${API_BASE}/${endpoint}`,
                 { sessionId: selectedSession._id },
                 { responseType: 'blob' }
             );
@@ -236,7 +236,7 @@ export default function ChatBot() {
     const handleConfirmDelete = async () => {
         if (!sessionToDelete) return;
         try {
-            await axios.delete(`${API_BASE}/chat/sessions/${sessionToDelete}`);
+            await axios.delete(`${API_BASE}/sessions/${sessionToDelete}`);
             if (selectedSession?._id === sessionToDelete) {
                 handleNewSession();
             }

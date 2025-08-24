@@ -34,7 +34,7 @@ const ChatInput = ({ input, setInput, onSend, onEnd, disabled }) => {
         <div className="input-area">
             <div className="input-wrapper">
                 <div
-                    ref={editableDivRef} // 3. Attach the ref to the div
+                    ref={editableDivRef}
                     className="chat-input-editable"
                     contentEditable={!disabled}
                     onInput={handleInput}
