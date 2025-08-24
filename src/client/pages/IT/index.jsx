@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect, useRef } from 'react';
 import './it.style.css';
 import { LayoutDashboard, AlertTriangle, Server, Wrench, Users, Bell, Plus, Search, Download, Calendar, Activity as ActivityIcon, Thermometer, Droplet, Zap, Cloud, Shield, Wifi, WifiOff, CheckCircle2, X, Eye, Clock, AlertCircle, Flame } from 'lucide-react';
 import socketService from '../../utils/socket.js';
+import mqtt from "mqtt";
 
 export default function ITDashboard() {
 	const [activeTab, setActiveTab] = useState('Incidents');
@@ -14,6 +15,16 @@ export default function ITDashboard() {
 	const [healthOverview, setHealthOverview] = useState(null);
 	const [isConnected, setIsConnected] = useState(false);
 	const [realtimeAlerts, setRealtimeAlerts] = useState([]);
+	const [isLoading, setIsLoading] = useState(true);
+	const [loadingStates, setLoadingStates] = useState({
+		incidents: true,
+		assets: true,
+		services: true,
+		health: true,
+		users: true,
+		alerts: true
+	});
+	const [errors, setErrors] = useState({});
 	const alertSound = useRef(null);
 	// Prepare dynamic health metrics array
 	const healthMetrics = useMemo(() => {
@@ -134,42 +145,55 @@ export default function ITDashboard() {
 		
 		// Cleanup function
 		return () => {
-			socketService.removeAllListeners();
 			socketService.disconnect();
 		};
 	}, []);
 
 	// Fetch initial data
 	useEffect(() => {
-		fetch('/api/support-ticket')
-			.then(res => res.json())
-			.then(data => setIncidents(data))
-			.catch(err => console.error(err));
-		fetch('/api/datacenter')
-			.then(res => res.json())
-			.then(data => {
-				setAssets(data);
-				// Populate servers from datacenter assets
-				setServers(data.filter(item => item.assetType === 'server'));
-			})
-			.catch(err => console.error(err));
-		// Fetch change requests (services) as change items
-		fetch('/api/service')
-			.then(res => res.json())
-			.then(data => setChanges(data))
-			.catch(err => console.error(err));
-		fetch('/api/datacenter/health/overview')
-			.then(res => res.json())
-			.then(data => setHealthOverview(data))
-			.catch(err => console.error(err));
-		fetch('/api/users')
-			.then(res => res.json())
-			.then(data => setUsers(data))
-			.catch(err => console.error(err));
-		fetch('/api/alerts')
-			.then(res => res.json())
-			.then(data => setAlerts(data))
-			.catch(err => console.error(err));
+		const fetchWithErrorHandling = async (url, setter, label, stateKey) => {
+			try {
+				setLoadingStates(prev => ({ ...prev, [stateKey]: true }));
+				setErrors(prev => ({ ...prev, [stateKey]: null }));
+				
+				const response = await fetch(url);
+				if (!response.ok) {
+					throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+				}
+				const data = await response.json();
+				setter(data);
+				console.log(`✅ Successfully loaded ${label}:`, data.length || 'N/A');
+			} catch (error) {
+				console.error(`❌ Failed to load ${label} from ${url}:`, error);
+				setErrors(prev => ({ ...prev, [stateKey]: error.message }));
+				// Set empty array as fallback to prevent UI crashes
+				if (typeof setter === 'function') {
+					setter([]);
+				}
+			} finally {
+				setLoadingStates(prev => ({ ...prev, [stateKey]: false }));
+			}
+		};
+
+		// Fetch all data with proper error handling
+		const loadData = async () => {
+			await Promise.all([
+				fetchWithErrorHandling('/api/support-ticket', setIncidents, 'support tickets', 'incidents'),
+				fetchWithErrorHandling('/api/datacenter', (data) => {
+					setAssets(data);
+					// Populate servers from datacenter assets
+					setServers(data.filter(item => item.assetType === 'server'));
+				}, 'datacenter assets', 'assets'),
+				fetchWithErrorHandling('/api/service', setChanges, 'services', 'services'),
+				fetchWithErrorHandling('/api/datacenter/health/overview', setHealthOverview, 'health overview', 'health'),
+				fetchWithErrorHandling('/api/users', setUsers, 'users', 'users'),
+				fetchWithErrorHandling('/api/alerts', setAlerts, 'alerts', 'alerts')
+			]);
+			
+			setIsLoading(false);
+		};
+		
+		loadData();
 	}, []);
 	// Search term state
 	const [searchTerm, setSearchTerm] = useState('');
@@ -483,6 +507,28 @@ export default function ITDashboard() {
 					))}
 				</div>
 				{/* Removed filters/toolbar under metrics for a cleaner layout */}
+
+				{/* Loading and Error States */}
+				{isLoading && (
+					<div className="mt-6 bg-white p-8 rounded-lg shadow-md">
+						<div className="flex items-center justify-center">
+							<div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mr-3"></div>
+							<span className="text-gray-600">Loading dashboard data...</span>
+						</div>
+					</div>
+				)}
+
+				{/* Error Display */}
+				{Object.keys(errors).some(key => errors[key]) && (
+					<div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4">
+						<h3 className="text-red-800 font-semibold mb-2">⚠️ Some data could not be loaded:</h3>
+						<ul className="text-red-700 text-sm space-y-1">
+							{Object.entries(errors).map(([key, error]) => 
+								error && <li key={key}>• {key}: {error}</li>
+							)}
+						</ul>
+					</div>
+				)}
 
 				{/* Content Grid */}
 				<div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">

@@ -40,18 +40,48 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/customers", customerRoutes);
 app.use("/api/support-ticket", supportTicketRoutes); // Use only /api/support-ticket for support tickets
-const MONGO_URI = process.env.MONGO_URI;
-mongoose.connect(MONGO_URI)
-  .then(() => console.log("Successfully connected to MongoDB"))
-  .catch(err => console.error("MongoDB connection error:", err));
+const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/bloom';
+
+// Enhanced MongoDB connection with error handling
+mongoose.connect(MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+  socketTimeoutMS: 45000, // Close sockets after 45 seconds of inactivity
+  maxPoolSize: 10, // Maintain up to 10 socket connections
+  serverSelectionTimeoutMS: 5000, // Keep trying to send operations for 5 seconds
+  heartbeatFrequencyMS: 10000, // Increase heartbeat frequency to 10 seconds
+})
+  .then(() => {
+    console.log("✅ Successfully connected to MongoDB");
+    console.log(`📊 Database: ${mongoose.connection.name}`);
+  })
+  .catch(err => {
+    console.error("❌ MongoDB connection error:", err);
+    console.log("💡 Make sure MongoDB is running and MONGO_URI is correct");
+    process.exit(1);
+  });
+
+// Handle MongoDB connection events
+mongoose.connection.on('error', (err) => {
+  console.error('❌ MongoDB connection error:', err);
+});
+
+mongoose.connection.on('disconnected', () => {
+  console.log('❌ MongoDB disconnected');
+});
+
+mongoose.connection.on('connected', () => {
+  console.log('✅ MongoDB connected');
+});
+
+mongoose.connection.on('reconnected', () => {
+  console.log('🔄 MongoDB reconnected');
+});
 
 app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
 });
-
-// Middleware to parse JSON requests
-app.use(express.json());
-app.use(express.urlencoded({ extended: true })); // Add this line
 
 
 // User routes
@@ -125,6 +155,53 @@ io.on("connection", (socket) => {
 ViteExpress.bind(app, server);
 
 // Listen on one port for both API + WebSocket
-server.listen(3000, () => {
-  console.log("Server + WebSocket running on port 3000");
+const PORT = process.env.PORT || 3000;
+server.listen(PORT, () => {
+  console.log(`🚀 Server + WebSocket running on port ${PORT}`);
+});
+
+// Graceful shutdown handling
+process.on('SIGINT', async () => {
+  console.log('\n🛑 Received SIGINT. Graceful shutdown...');
+  
+  // Close server
+  server.close(() => {
+    console.log('🔌 HTTP server closed');
+  });
+  
+  // Close WebSocket
+  io.close(() => {
+    console.log('📡 WebSocket server closed');
+  });
+  
+  // Close MongoDB connection
+  try {
+    await mongoose.connection.close();
+    console.log('💾 MongoDB connection closed');
+  } catch (err) {
+    console.error('❌ Error closing MongoDB connection:', err);
+  }
+  
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  console.log('🛑 Received SIGTERM. Graceful shutdown...');
+  
+  server.close(() => {
+    console.log('🔌 HTTP server closed');
+  });
+  
+  io.close(() => {
+    console.log('📡 WebSocket server closed');
+  });
+  
+  try {
+    await mongoose.connection.close();
+    console.log('💾 MongoDB connection closed');
+  } catch (err) {
+    console.error('❌ Error closing MongoDB connection:', err);
+  }
+  
+  process.exit(0);
 });
