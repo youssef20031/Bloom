@@ -9,6 +9,12 @@ const TYPE_LABEL = {
   infrastructure: 'Infrastructure'
 };
 
+const TYPE_COLORS = {
+  infrastructure: { gradient: 'from-indigo-500 to-indigo-600', pill: 'bg-indigo-100 text-indigo-700', select: 'bg-indigo-600 hover:bg-indigo-700' },
+  ai_hosted: { gradient: 'from-emerald-500 to-emerald-600', pill: 'bg-emerald-100 text-emerald-700', select: 'bg-emerald-600 hover:bg-emerald-700' },
+  ai_only: { gradient: 'from-purple-500 to-purple-600', pill: 'bg-purple-100 text-purple-700', select: 'bg-purple-600 hover:bg-purple-700' }
+};
+
 export default function Services() {
   // Sidebar related state
   const [userName, setUserName] = useState('');
@@ -24,6 +30,7 @@ export default function Services() {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
+  const [expandedService, setExpandedService] = useState(null);
 
   // Service selection state
   const [purchasedServiceIds, setPurchasedServiceIds] = useState([]);
@@ -134,56 +141,123 @@ export default function Services() {
   };
 
   const ServiceCard = ({ svc }) => {
-    const isOpen = expandedId === svc._id;
+    const isOpen = expandedId === svc._id; // drives chevron state & highlight
     const purchased = purchasedServiceIds.includes(svc._id);
     const fb = purchaseFeedback[svc._id];
+    const colors = TYPE_COLORS[svc.type] || { gradient: 'from-blue-500 to-blue-600', pill: 'bg-blue-100 text-blue-700', select: 'bg-blue-600 hover:bg-blue-700' };
+    // Explicit Tailwind classes so they are not purged
+    let closedColorClasses = 'text-white bg-blue-500 hover:bg-blue-600 focus:ring-blue-300';
+    let openColorClasses = 'text-blue-700 bg-blue-50 focus:ring-blue-300';
+    if (svc.type === 'infrastructure') { closedColorClasses = 'text-white bg-indigo-500 hover:bg-indigo-600 focus:ring-indigo-300'; openColorClasses = 'text-indigo-700 bg-indigo-50 focus:ring-indigo-300'; }
+    else if (svc.type === 'ai_hosted') { closedColorClasses = 'text-white bg-emerald-500 hover:bg-emerald-600 focus:ring-emerald-300'; openColorClasses = 'text-emerald-700 bg-emerald-50 focus:ring-emerald-300'; }
+    else if (svc.type === 'ai_only') { closedColorClasses = 'text-white bg-purple-500 hover:bg-purple-600 focus:ring-purple-300'; openColorClasses = 'text-purple-700 bg-purple-50 focus:ring-purple-300'; }
+
+    const toggleDetails = () => {
+      if (isOpen) {
+        setExpandedId(null);
+        setExpandedService(null);
+      } else {
+        setExpandedId(svc._id);
+        setExpandedService(svc);
+      }
+    };
+
     return (
-      <div className="group relative rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm p-5 shadow-sm hover:shadow-md transition-all flex flex-col">
+      <div className={`group relative rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm p-5 shadow-sm hover:shadow-md transition-all flex flex-col ${expandedService && expandedService._id===svc._id ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}>
         <div className="flex items-start gap-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center text-white shadow-md">
+          <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${colors.gradient} flex items-center justify-center text-white shadow-md`}>
             {svc.type === 'infrastructure' ? <Server className="w-6 h-6" /> : svc.type === 'ai_hosted' ? <Layers className="w-6 h-6" /> : <Bot className="w-6 h-6" />}
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="font-semibold text-slate-800 text-lg leading-tight truncate" title={svc.name}>{svc.name}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-              <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-medium">{TYPE_LABEL[svc.type] || svc.type}</span>
+              <span className={`px-2 py-0.5 rounded-full font-medium ${colors.pill}`}>{TYPE_LABEL[svc.type] || svc.type}</span>
               {Array.isArray(svc.associatedProducts) && svc.associatedProducts.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 font-medium flex items-center gap-1"><Package className="w-3 h-3" /> {svc.associatedProducts.length} products</span>
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1"><Package className="w-3 h-3" /> {svc.associatedProducts.length} products</span>
               )}
             </div>
           </div>
-          <button onClick={() => setExpandedId(isOpen ? null : svc._id)} className="p-2 rounded-md text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition" aria-expanded={isOpen} aria-label={isOpen ? 'Collapse details' : 'Expand details'}>
+          <button
+            onClick={toggleDetails}
+            className={`p-2 rounded-md transition focus:outline-none focus:ring-2 focus:ring-offset-1 ${isOpen ? openColorClasses : closedColorClasses}`}
+            aria-expanded={isOpen}
+            aria-label={isOpen ? 'Hide details' : 'Show details'}
+          >
             {isOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </button>
         </div>
-        {isOpen && (
-          <div className="mt-4 text-sm text-slate-600 animate-fade-in space-y-3">
-            <p>{svc.description || 'No description provided.'}</p>
-            {svc.hostingDetails && (svc.hostingDetails.datacenterLocation || svc.hostingDetails.vmSpecs) && (
-              <div className="rounded-lg bg-slate-50 border border-slate-200 p-3">
-                <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Hosting Details</h4>
-                {svc.hostingDetails.datacenterLocation && <p className="text-xs"><span className="font-medium">Location:</span> {svc.hostingDetails.datacenterLocation}</p>}
-                {svc.hostingDetails.vmSpecs && <pre className="mt-2 text-[11px] leading-snug bg-white rounded p-2 border overflow-x-auto">{JSON.stringify(svc.hostingDetails.vmSpecs, null, 2)}</pre>}
-              </div>
-            )}
-            <div className="flex flex-wrap gap-2 items-center">
-              <button
-                className={`px-3 py-1.5 rounded-md text-xs font-medium shadow focus:outline-none focus:ring flex items-center gap-2 ${purchased ? 'bg-emerald-600 text-white cursor-default' : 'bg-blue-600 hover:bg-blue-700 text-white'} ${purchasingServiceId===svc._id ? 'opacity-70' : ''}`}
-                disabled={purchased || purchasingServiceId===svc._id}
-                onClick={() => handleSelectService(svc)}
-              >
-                {purchased ? 'Selected' : purchasingServiceId===svc._id ? 'Selecting...' : 'Select'}
-              </button>
-              <button className="px-3 py-1.5 rounded-md bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-medium focus:outline-none focus:ring focus:ring-slate-300" onClick={() => setMode('chat')}>Ask AI About This</button>
-              {fb && (
-                <span className={`text-xs ${fb.status==='success' ? 'text-emerald-600' : fb.status==='error' ? 'text-red-600' : 'text-slate-500'}`}>{fb.message}</span>
-              )}
-            </div>
-          </div>
-        )}
+        <div className="mt-4 flex flex-wrap gap-2 items-center">
+          <button
+            className={`px-3 py-1.5 rounded-md text-xs font-medium shadow focus:outline-none focus:ring flex items-center gap-2 ${purchased ? 'bg-emerald-600 text-white cursor-default' : `${colors.select} text-white`} ${purchasingServiceId===svc._id ? 'opacity-70' : ''}`}
+            disabled={purchased || purchasingServiceId===svc._id}
+            onClick={() => handleSelectService(svc)}
+          >
+            {purchased ? 'Selected' : purchasingServiceId===svc._id ? 'Selecting...' : 'Select'}
+          </button>
+          <button
+            className="px-3 py-1.5 rounded-md text-xs font-medium focus:outline-none focus:ring transition bg-slate-100 hover:bg-slate-200 text-slate-700"
+            onClick={() => setMode('chat')}
+          >Ask AI</button>
+          {fb && (
+            <span className={`text-xs ${fb.status==='success' ? 'text-emerald-600' : fb.status==='error' ? 'text-red-600' : 'text-slate-500'}`}>{fb.message}</span>
+          )}
+        </div>
       </div>
     );
   };
+
+  const ServiceDetails = ({ svc, onClose }) => {
+    if (!svc) return null;
+    return (
+      <div className="mt-10 col-span-full rounded-2xl border border-slate-200 bg-white/90 backdrop-blur p-6 shadow-xl">
+        <div className="flex items-start justify-between gap-6 flex-wrap">
+          <div className="flex items-center gap-4">
+            <div className={`w-14 h-14 rounded-xl bg-gradient-to-br ${(TYPE_COLORS[svc.type]||{}).gradient || 'from-blue-500 to-blue-600'} flex items-center justify-center text-white shadow-md`}>
+              {svc.type === 'infrastructure' ? <Server className="w-7 h-7" /> : svc.type === 'ai_hosted' ? <Layers className="w-7 h-7" /> : <Bot className="w-7 h-7" />}
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold text-slate-800 leading-tight">{svc.name}</h2>
+              <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <span className={`px-2 py-0.5 rounded-full font-medium ${(TYPE_COLORS[svc.type]||{}).pill || 'bg-blue-100 text-blue-700'}`}>{TYPE_LABEL[svc.type] || svc.type}</span>
+                {Array.isArray(svc.associatedProducts) && svc.associatedProducts.length > 0 && (
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1"><Package className="w-3 h-3" /> {svc.associatedProducts.length} products</span>
+                )}
+              </div>
+            </div>
+          </div>
+          <button onClick={() => { onClose(); setExpandedId(null); }} className="ml-auto px-3 py-1.5 rounded-md text-sm bg-slate-100 hover:bg-slate-200 text-slate-600 border border-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-300">Close</button>
+        </div>
+        <div className="mt-6 space-y-6 text-sm text-slate-700">
+          <section>
+            <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Description</h3>
+            <p className="leading-relaxed">{svc.description || 'No description provided.'}</p>
+          </section>
+          {svc.hostingDetails && (svc.hostingDetails.datacenterLocation || svc.hostingDetails.vmSpecs) && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-2">Hosting Details</h3>
+              {svc.hostingDetails.datacenterLocation && <p className="text-xs mb-2"><span className="font-medium">Location:</span> {svc.hostingDetails.datacenterLocation}</p>}
+              {svc.hostingDetails.vmSpecs && <pre className="mt-1 text-xs leading-snug bg-slate-50 rounded p-3 border overflow-x-auto">{JSON.stringify(svc.hostingDetails.vmSpecs, null, 2)}</pre>}
+            </section>
+          )}
+          {Array.isArray(svc.associatedProducts) && svc.associatedProducts.length > 0 && (
+            <section>
+              <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Associated Products</h3>
+              <ul className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                {svc.associatedProducts.map((p,i)=>(<li key={i} className="px-3 py-2 rounded-md bg-slate-100 text-slate-700 text-xs font-medium truncate" title={p}>{p}</li>))}
+              </ul>
+            </section>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  // Close details with ESC
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') { setExpandedService(null); setExpandedId(null);} };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   return (
     <div className="flex h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-white to-blue-50">
@@ -224,6 +298,7 @@ export default function Services() {
               <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
                 {filtered.map(svc => <ServiceCard key={svc._id} svc={svc} />)}
               </div>
+              {expandedService && <ServiceDetails svc={expandedService} onClose={()=> setExpandedService(null)} />}
             </div>
           )}
           {mode === 'chat' && (

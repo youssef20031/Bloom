@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import './customerview.style.css';
-import { Home, Briefcase, LifeBuoy, Info, Bell, Plus, ChevronDown, Server, Database, HardDrive, AlertTriangle, FileText, ArrowUp, ArrowDown, Minus, LogOut, ShoppingCart } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Briefcase, LifeBuoy, Bell, Plus, ChevronDown, Server, Database, HardDrive, AlertTriangle, FileText, ArrowUp, ArrowDown, Minus, ShoppingCart } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import CustomerSidebar from '../../components/CustomerSidebar.jsx';
 
 export default function CustomerView({ initialSection = 'overview' }) {
     const navigate = useNavigate();
+    const location = useLocation();
     const [userId, setUserId] = useState(null);
     const [userName, setUserName] = useState('');
     const [services, setServices] = useState([]); // kept for potential future use (Add Service action)
@@ -18,32 +20,82 @@ export default function CustomerView({ initialSection = 'overview' }) {
     const [stats, setStats] = useState({ totalAssets: 0, assetsByType: {}, averages: {}, alerts: {} });
     const [activeSection, setActiveSection] = useState(initialSection);
 
-    // Support ticket view controls
+    // Support tickets view state (restored after regression)
     const [supportPage, setSupportPage] = useState(1);
     const [supportEntries, setSupportEntries] = useState(10);
     const [supportStatusFilter, setSupportStatusFilter] = useState('all');
     const [supportSortOrder, setSupportSortOrder] = useState('newest');
 
-    // Helper to color status badges
+    // Helper to color support ticket status badges (restored)
     const getStatusColor = (status) => {
-        if (!status) return '#6c757d';
+        if (!status) return '#6b7280'; // gray-500 fallback
         switch (status.toLowerCase()) {
-            case 'open': return '#28a745';
-            case 'close':
-            case 'closed': return '#dc3545';
-            case 'pending': return '#ffc107';
-            case 'in-progress': return '#17a2b8';
-            default: return '#6c757d';
+            case 'open': return '#16a34a'; // green-600
+            case 'pending': return '#d97706'; // amber-600
+            case 'in-progress': return '#0d9488'; // teal-600
+            case 'closed':
+            case 'close': return '#dc2626'; // red-600
+            default: return '#6b7280';
         }
     };
-
     const StatusBadge = ({ status }) => (
-        <span
-            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium"
-            style={{ backgroundColor: getStatusColor(status), color: 'white' }}>
+        <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium text-white" style={{ backgroundColor: getStatusColor(status) }}>
             ● {status}
         </span>
     );
+
+    // Notifications
+    const [notifications, setNotifications] = useState([]); // {id,type,message,date,read}
+    const [readIds, setReadIds] = useState(()=>{ try { return JSON.parse(localStorage.getItem('customerNotificationReadIds')||'[]'); } catch { return []; } });
+    const [showNotifPanel, setShowNotifPanel] = useState(false);
+    const notifPanelRef = useRef(null);
+
+    // Close notification panel on outside click
+    useEffect(()=> {
+        const handler = (e) => {
+            if(showNotifPanel && notifPanelRef.current && !notifPanelRef.current.contains(e.target)) {
+                setShowNotifPanel(false);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return ()=> document.removeEventListener('mousedown', handler);
+    }, [showNotifPanel]);
+
+    // Persist read ids
+    useEffect(()=> { localStorage.setItem('customerNotificationReadIds', JSON.stringify(readIds)); }, [readIds]);
+
+    // Derive notifications from domain data
+    useEffect(()=> {
+        const list = [];
+        // Open tickets
+        tickets.filter(t => (t.status||'').toLowerCase()==='open').forEach(t=> {
+            list.push({ id: 'ticket-'+t.id, type:'ticket', date: t.createdAt, message: `Ticket ${t.id.slice(-6)} is still open`, read: readIds.includes('ticket-'+t.id) });
+        });
+        // Invoices
+        invoices.forEach(inv => {
+            if(inv.status==='overdue') list.push({ id:'invoice-overdue-'+inv.id, type:'invoice', date: inv.date, message:`Invoice ${inv.id.slice(-6)} is overdue`, read: readIds.includes('invoice-overdue-'+inv.id) });
+            else if(inv.status==='pending') list.push({ id:'invoice-pending-'+inv.id, type:'invoice', date: inv.date, message:`Invoice ${inv.id.slice(-6)} is pending payment`, read: readIds.includes('invoice-pending-'+inv.id) });
+        });
+        // Recent orders (last 7 days)
+        const sevenDaysAgo = Date.now() - 7*24*60*60*1000;
+        orders.forEach(o => { const ts = new Date(o.datePurchased).getTime(); if(ts >= sevenDaysAgo) { list.push({ id:'order-'+o.id, type:'order', date:o.datePurchased, message:`New ${o.kind} order: ${o.name}`, read: readIds.includes('order-'+o.id) }); } });
+        // Sort newest first
+        list.sort((a,b)=> new Date(b.date) - new Date(a.date));
+        setNotifications(list);
+    }, [tickets, invoices, orders, readIds]);
+
+    const unreadCount = notifications.filter(n=> !n.read).length;
+    const markAllRead = () => {
+        const ids = Array.from(new Set([...readIds, ...notifications.map(n=> n.id)]));
+        setNotifications(n=> n.map(x=> ({...x, read:true})));
+        setReadIds(ids);
+    };
+    const toggleNotificationPanel = () => setShowNotifPanel(s=> !s);
+    const markRead = (id) => {
+        if(readIds.includes(id)) return;
+        setReadIds(r=> [...r, id]);
+        setNotifications(ns => ns.map(n=> n.id===id ? {...n, read:true}: n));
+    };
 
     // Load logged in user
     useEffect(() => {
@@ -220,60 +272,13 @@ export default function CustomerView({ initialSection = 'overview' }) {
     }, [stats]);
 
     // Action handlers
-    const handleCreateTicket = () => {
-        setActiveSection('support');
-        // slight timeout to scroll after render
-        setTimeout(() => { const el = document.getElementById('support-section'); if (el) el.scrollIntoView({ behavior: 'smooth' }); }, 50);
-    };
+    const handleCreateTicket = () => navigate('/dashboard/support');
     const handleAddService = () => navigate('/services');
-    const handleViewBilling = () => {
-        setActiveSection('billing');
-        setTimeout(()=>{ const el = document.getElementById('billing-section'); if(el) el.scrollIntoView({behavior:'smooth'}); }, 50);
-    };
-    const handleViewOrders = () => {
-        setActiveSection('orders');
-        setTimeout(()=>{ const el = document.getElementById('orders-section'); if(el) el.scrollIntoView({behavior:'smooth'}); }, 50);
-    };
+    const handleViewBilling = () => navigate('/dashboard/billing');
+    const handleViewOrders = () => navigate('/dashboard/orders');
     const handleLogout = () => { localStorage.removeItem('user'); navigate('/login'); };
 
-    // Subcomponents (collocated for clarity)
-    const Sidebar = () => (
-        <aside
-            className="w-64 bg-primary-900 bg-gradient-to-b from-primary-900 via-primary-800 to-primary-950 text-white flex-shrink-0 shadow-2xl relative overflow-hidden"
-            style={{ background: 'linear-gradient(to bottom, hsl(224,64%,33%), hsl(224,64%,33%) 10%, hsl(226,71%,40%) 55%, hsl(226,60%,23%) 100%)' }}
-        >
-            <div className="absolute inset-0 opacity-10">
-                <div className="absolute top-0 left-0 w-32 h-32 bg-gradient-to-br from-white to-transparent rounded-full -translate-x-16 -translate-y-16" />
-                <div className="absolute bottom-0 right-0 w-40 h-40 bg-gradient-to-tl from-white to-transparent rounded-full translate-x-20 translate-y-20" />
-            </div>
-            <div className="relative z-10 p-6 border-b border-primary-700/50">
-                <div className="flex items-center space-x-3">
-                    <img src="https://images.unsplash.com/photo-1490750967868-88aa4486c946?auto=format&fit=crop&w=80&q=60" alt="BLOOM Logo" className="w-10 h-10 rounded-lg shadow-lg ring-2 ring-white/20" />
-                    <span className="text-xl font-bold tracking-tight">BLOOM</span>
-                </div>
-            </div>
-            <nav className="relative z-10 flex-1 p-4 space-y-2">
-                <h3 className="text-xs font-semibold text-primary-300 uppercase tracking-wider mb-3">Navigation</h3>
-                <button onClick={() => setActiveSection('overview')} className={`group flex w-full items-center px-4 py-3 rounded-xl font-medium transition-all duration-200 relative overflow-hidden ${activeSection === 'overview' ? 'bg-white/10 text-white' : 'text-primary-200 hover:text-white hover:bg-white/10'}`}> <Home className="w-5 h-5 mr-3" /> Overview </button>
-                <button onClick={() => navigate('/services')} className="group flex w-full items-center px-4 py-3 rounded-xl text-primary-200 hover:text-white hover:bg-white/10 font-medium transition-all duration-200 relative overflow-hidden"> <Briefcase className="w-5 h-5 mr-3" /> Services </button>
-                <button onClick={() => setActiveSection('support')} className={`group flex w-full items-center px-4 py-3 rounded-xl font-medium transition-all duration-200 relative overflow-hidden ${activeSection === 'support' ? 'bg-white/10 text-white' : 'text-primary-200 hover:text-white hover:bg-white/10'}`}> <LifeBuoy className="w-5 h-5 mr-3" /> Support <span className="ml-auto bg-amber-500 text-white text-xs px-2 py-1 rounded-full font-bold min-w-[1.25rem] text-center" data-testid="text-open-tickets-count">{openTicketCount}</span></button>
-                <button onClick={() => setActiveSection('billing')} className={`group flex w-full items-center px-4 py-3 rounded-xl font-medium transition-all duration-200 relative overflow-hidden ${activeSection === 'billing' ? 'bg-white/10 text-white' : 'text-primary-200 hover:text-white hover:bg-white/10'}`}> <FileText className="w-5 h-5 mr-3" /> Billing </button>
-                <button onClick={() => setActiveSection('orders')} className={`group flex w-full items-center px-4 py-3 rounded-xl font-medium transition-all duration-200 relative overflow-hidden ${activeSection === 'orders' ? 'bg-white/10 text-white' : 'text-primary-200 hover:text-white hover:bg-white/10'}`}> <ShoppingCart className="w-5 h-5 mr-3" /> Orders </button>
-                <button onClick={() => setActiveSection('info')} className={`group flex w-full items-center px-4 py-3 rounded-xl font-medium transition-all duration-200 relative overflow-hidden ${activeSection === 'info' ? 'bg-white/10 text-white' : 'text-primary-200 hover:text-white hover:bg-white/10'}`}> <Info className="w-5 h-5 mr-3" /> More Info </button>
-            </nav>
-            <div className="relative z-10 p-6 border-t border-primary-700/50">
-                <div className="flex items-center space-x-3">
-                    <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=80&q=60" alt="User Avatar" className="w-10 h-10 rounded-full ring-2 ring-white/30" />
-                    <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate" data-testid="text-username">{userName}</p>
-                        <p className="text-xs text-primary-300">Customer</p>
-                    </div>
-                    <button className="p-2 text-primary-300 hover:text-white transition-colors" onClick={handleLogout} data-testid="button-logout"><LogOut className="w-4 h-4" /></button>
-                </div>
-            </div>
-        </aside>
-    );
-
+    // Subcomponent definitions (previously collated) restored after refactor to shared sidebar
     const Header = () => (
         <header className="glassmorphism sticky top-0 z-40 border-b border-white/20 p-6 bg-white/60 backdrop-blur-md">
             <div className="flex items-center justify-between">
@@ -281,13 +286,44 @@ export default function CustomerView({ initialSection = 'overview' }) {
                     <h1 className="text-3xl font-bold text-primary-700">Welcome Back, <span className="text-primary-800">{userName}</span></h1>
                     <p className="text-gray-600 mt-1 font-medium">Here's what's happening with your services today.</p>
                 </div>
-                <div className="flex items-center space-x-4">
-                    <button className="relative p-3 text-gray-500 hover:text-gray-700 hover:bg-white/60 rounded-xl transition-all group" data-testid="button-notifications">
+                <div className="flex items-center space-x-4 relative" ref={notifPanelRef}>
+                    <button
+                        onClick={toggleNotificationPanel}
+                        className={`relative p-3 rounded-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${showNotifPanel ? 'ring-2 ring-blue-500/40' : ''} ${unreadCount>0 ? 'bg-white text-blue-600 shadow ring-1 ring-blue-200 hover:bg-blue-50' : 'bg-white text-gray-500 hover:text-gray-700 hover:bg-gray-100'}`}
+                        data-testid="button-notifications"
+                        aria-haspopup="true"
+                        aria-expanded={showNotifPanel}
+                        aria-label="Notifications"
+                    >
                         <Bell className="w-6 h-6" />
-                        {openTicketCount > 0 && (
-                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold">{openTicketCount}</span>
+                        {unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 min-w-[1.1rem] h-5 bg-red-500 text-white text-[10px] rounded-full flex items-center justify-center font-bold px-1">{unreadCount}</span>
                         )}
                     </button>
+                    {showNotifPanel && (
+                        <div className="absolute right-0 top-14 w-96 max-w-[90vw] bg-white rounded-xl shadow-2xl border border-gray-200/70 overflow-hidden animate-fadeIn z-50">
+                            <div className="flex items-center justify-between px-4 py-3 border-b bg-gray-50">
+                                <h4 className="font-semibold text-gray-800 text-sm">Notifications</h4>
+                                <div className="flex items-center gap-2">
+                                    {unreadCount>0 && <button onClick={markAllRead} className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-blue-600 text-white text-[10px] font-semibold tracking-wide hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition shadow-sm" title="Mark all notifications as read">Mark all read</button>}
+                                    <button onClick={()=> setShowNotifPanel(false)} className="inline-flex items-center px-2 py-1 rounded-md bg-gray-200 text-gray-700 text-[10px] font-semibold tracking-wide hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-400/40 transition shadow-sm" title="Close notifications panel">Close</button>
+                                </div>
+                            </div>
+                            <ul className="max-h-80 overflow-y-auto divide-y">
+                                {notifications.length===0 && <li className="p-4 text-sm text-gray-500">No notifications</li>}
+                                {notifications.map(n => (
+                                    <li key={n.id} className={`p-4 text-sm flex items-start gap-3 cursor-pointer hover:bg-gray-50 ${!n.read ? 'bg-blue-50/40' : ''}`} onClick={()=> markRead(n.id)}>
+                                        <span className={`mt-1 w-2 h-2 rounded-full flex-shrink-0 ${n.read? 'bg-gray-300':'bg-blue-500 animate-pulse'}`}></span>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-gray-800 leading-snug">{n.message}</p>
+                                            <p className="text-[10px] uppercase tracking-wide text-gray-400 mt-1">{new Date(n.date).toLocaleString()}</p>
+                                        </div>
+                                        {!n.read && <button onClick={(e)=>{ e.stopPropagation(); markRead(n.id); }} className="inline-flex items-center px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-semibold hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition shadow-sm" title="Mark this notification as read">Mark</button>}
+                                    </li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
                     <div className="flex items-center space-x-3 bg-white/60 backdrop-blur-sm rounded-xl p-2 hover:bg-white/80 transition-all cursor-pointer group">
                         <img src="https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?auto=format&fit=crop&w=80&q=60" alt="User Avatar" className="w-10 h-10 rounded-full ring-2 ring-primary-200" />
                         <ChevronDown className="w-4 h-4 text-gray-500" />
@@ -297,14 +333,14 @@ export default function CustomerView({ initialSection = 'overview' }) {
         </header>
     );
 
-    const StatCard = ({ label, value, icon: Icon, trend, trendDir }) => (
+    const StatCard = ({ label, value, icon: Icon, trend, trendDir, iconBg = 'from-blue-500 to-blue-600' }) => (
         <div className="stat-card-hover glassmorphism rounded-2xl p-6 border border-white/20 bg-gradient-to-br from-white/40 to-white/20 backdrop-blur-xl">
             <div className="flex items-center justify-between mb-4">
                 <div>
                     <p className="text-sm font-semibold text-gray-600 mb-1">{label}</p>
                     <p className="text-3xl font-bold text-gray-900 count-up" data-target={value}>{value}</p>
                 </div>
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
+                <div className={`w-12 h-12 bg-gradient-to-br ${iconBg} rounded-xl flex items-center justify-center shadow-lg`}>
                     <Icon className="w-6 h-6 text-white" />
                 </div>
             </div>
@@ -319,11 +355,11 @@ export default function CustomerView({ initialSection = 'overview' }) {
 
     const StatsGrid = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-            <StatCard label="My Services" value={services.length || 0} icon={Briefcase} trend={0} trendDir="flat" />
-            <StatCard label="Total Assets" value={stats.totalAssets || 0} icon={Database} trend={12} trendDir="up" />
-            <StatCard label="Active Servers" value={stats.assetsByType.server || 0} icon={Server} trend={8} trendDir="up" />
-            <StatCard label="Storage Devices" value={stats.assetsByType.storage || 0} icon={HardDrive} trend={2} trendDir={ (stats.assetsByType.storage||0) >= 0 ? 'down' : 'up'} />
-            <StatCard label="Active Alerts" value={stats.alerts.totalActive || 0} icon={AlertTriangle} trend={25} trendDir="flat" />
+            <StatCard label="My Services" value={services.length || 0} icon={Briefcase} trend={0} trendDir="flat" iconBg="from-indigo-500 to-indigo-600" />
+            <StatCard label="Total Assets" value={stats.totalAssets || 0} icon={Database} trend={12} trendDir="up" iconBg="from-emerald-500 to-emerald-600" />
+            <StatCard label="Active Servers" value={stats.assetsByType.server || 0} icon={Server} trend={8} trendDir="up" iconBg="from-sky-500 to-sky-600" />
+            <StatCard label="Storage Devices" value={stats.assetsByType.storage || 0} icon={HardDrive} trend={2} trendDir={(stats.assetsByType.storage||0) >= 0 ? 'down' : 'up'} iconBg="from-purple-500 to-purple-600" />
+            <StatCard label="Active Alerts" value={stats.alerts.totalActive || 0} icon={AlertTriangle} trend={25} trendDir="flat" iconBg="from-rose-500 to-rose-600" />
         </div>
     );
 
@@ -331,25 +367,21 @@ export default function CustomerView({ initialSection = 'overview' }) {
         <div className="glassmorphism rounded-2xl p-8 border border-white/20 bg-gradient-to-br from-white/40 to-white/20 backdrop-blur-xl">
             <h2 className="text-2xl font-bold text-gray-900 mb-6">Quick Actions</h2>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                {/* Support */}
                 <button className="group relative overflow-hidden bg-gradient-to-br from-blue-50 to-blue-100 hover:from-blue-100 hover:to-blue-200 border-2 border-blue-200 hover:border-blue-300 rounded-xl p-6 text-left transition-all hover:shadow-xl" onClick={handleCreateTicket}>
                     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center mb-4"><LifeBuoy className="w-6 h-6 text-white" /></div>
                     <h3 className="font-bold text-gray-900 mb-2">Create Support Ticket</h3>
                     <p className="text-gray-600 text-sm">Get help with your services</p>
                 </button>
-                {/* Add Service */}
                 <button className="group relative overflow-hidden bg-gradient-to-br from-emerald-50 to-emerald-100 hover:from-emerald-100 hover:to-emerald-200 border-2 border-emerald-200 hover:border-emerald-300 rounded-xl p-6 text-left transition-all hover:shadow-xl" onClick={handleAddService}>
                     <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 to-emerald-600 rounded-xl flex items-center justify-center mb-4"><Plus className="w-6 h-6 text-white" /></div>
                     <h3 className="font-bold text-gray-900 mb-2">Add Service</h3>
                     <p className="text-gray-600 text-sm">Expand your infrastructure</p>
                 </button>
-                {/* Billing */}
                 <button className="group relative overflow-hidden bg-gradient-to-br from-amber-50 to-amber-100 hover:from-amber-100 hover:to-amber-200 border-2 border-amber-200 hover:border-amber-300 rounded-xl p-6 text-left transition-all hover:shadow-xl" onClick={handleViewBilling}>
                     <div className="w-12 h-12 bg-gradient-to-br from-amber-500 to-amber-600 rounded-xl flex items-center justify-center mb-4"><FileText className="w-6 h-6 text-white" /></div>
                     <h3 className="font-bold text-gray-900 mb-2">View Billing</h3>
                     <p className="text-gray-600 text-sm">Manage your invoices</p>
                 </button>
-                {/* Orders */}
                 <button className="group relative overflow-hidden bg-gradient-to-br from-purple-50 to-purple-100 hover:from-purple-100 hover:to-purple-200 border-2 border-purple-200 hover:border-purple-300 rounded-xl p-6 text-left transition-all hover:shadow-xl" onClick={handleViewOrders}>
                     <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl flex items-center justify-center mb-4"><ShoppingCart className="w-6 h-6 text-white" /></div>
                     <h3 className="font-bold text-gray-900 mb-2">View Orders</h3>
@@ -361,7 +393,6 @@ export default function CustomerView({ initialSection = 'overview' }) {
 
     const RecentSections = () => (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Recent Invoices */}
             <div className="glassmorphism rounded-2xl p-8 border border-white/20 bg-gradient-to-br from-white/40 to-white/20 backdrop-blur-xl">
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-gray-900">Recent Invoices</h3>
@@ -404,8 +435,6 @@ export default function CustomerView({ initialSection = 'overview' }) {
                     </div>
                 </div>
             </div>
-
-            {/* Recent Orders */}
             <div className="glassmorphism rounded-2xl p-8 border border-white/20 bg-gradient-to-br from-white/40 to-white/20 backdrop-blur-xl">
                 <div className="flex items-center justify-between mb-6">
                     <h3 className="text-xl font-bold text-gray-900">Recent Orders</h3>
@@ -437,42 +466,78 @@ export default function CustomerView({ initialSection = 'overview' }) {
     const SupportSection = () => (
         <div id="support-section" className="glassmorphism rounded-2xl p-8 border border-white/20 bg-white mt-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">Support Tickets</h2>
-            {/* Create Ticket */}
             <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Submit a Ticket</h3>
-                <textarea className="w-full border rounded-md p-3 resize-y" rows={4} placeholder="Describe your issue..." value={ticketDescription} onChange={e => setTicketDescription(e.target.value)} />
+                <textarea
+                    className="w-full border border-gray-300 bg-white text-gray-800 placeholder-gray-400 rounded-md p-3 resize-y shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
+                    rows={4}
+                    placeholder="Describe your issue..."
+                    value={ticketDescription}
+                    onChange={e => setTicketDescription(e.target.value)}
+                />
                 <div className="mt-2 flex justify-end">
-                    <button disabled={!ticketDescription.trim()} className="bg-blue-600 disabled:opacity-50 text-white px-4 py-2 rounded-md flex items-center gap-2" onClick={() => {
-                        const submit = async () => {
-                            try {
-                                const res = await fetch('/api/support-ticket', {
-                                    method: 'POST',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ customerId: customerDbId, issue: ticketDescription })
-                                });
-                                const result = await res.json();
-                                if (result && result.ticket) {
-                                    const t = result.ticket;
-                                    const mapped = { id: t._id, description: t.issue, status: t.status, createdAt: t.createdAt };
-                                    setTickets([mapped, ...tickets]);
-                                    setTicketDescription('');
-                                    setSupportPage(1);
+                    <button
+                        disabled={!ticketDescription.trim()}
+                        className="bg-blue-600 disabled:opacity-50 text-white px-4 py-2 rounded-md flex items-center gap-2 shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition"
+                        onClick={() => {
+                            const submit = async () => {
+                                try {
+                                    const res = await fetch('/api/support-ticket', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ customerId: customerDbId, issue: ticketDescription })
+                                    });
+                                    const result = await res.json();
+                                    if (result && result.ticket) {
+                                        const t = result.ticket;
+                                        const mapped = { id: t._id, description: t.issue, status: t.status, createdAt: t.createdAt };
+                                        setTickets([mapped, ...tickets]);
+                                        setTicketDescription('');
+                                        setSupportPage(1);
+                                    }
+                                } catch (err) {
+                                    console.error(err);
                                 }
-                            } catch (err) {
-                                console.error(err);
-                            }
-                        };
-                        submit();
-                    }}>Submit <Plus className="w-4 h-4" /></button>
+                            };
+                            submit();
+                        }}
+                    >Submit <Plus className="w-4 h-4" /></button>
                 </div>
             </div>
-            {/* Filters */}
             <div className="flex flex-wrap items-center gap-4 mb-4 text-sm">
-                <label className="flex items-center gap-2">Status: <select value={supportStatusFilter} onChange={e => { setSupportStatusFilter(e.target.value); setSupportPage(1); }} className="border p-1 rounded"><option value="all">All</option><option value="open">Open</option><option value="closed">Closed</option></select></label>
-                <label className="flex items-center gap-2">Sort: <select value={supportSortOrder} onChange={e => { setSupportSortOrder(e.target.value); setSupportPage(1); }} className="border p-1 rounded"><option value="newest">Newest First</option><option value="oldest">Oldest First</option></select></label>
-                <label className="flex items-center gap-2 ml-auto">Show: <select value={supportEntries} onChange={e => { setSupportEntries(Number(e.target.value)); setSupportPage(1); }} className="border p-1 rounded"><option value={5}>5</option><option value={10}>10</option><option value={25}>25</option></select> Rows</label>
+                <label className="flex items-center gap-2">Status:
+                    <select
+                        value={supportStatusFilter}
+                        onChange={e => { setSupportStatusFilter(e.target.value); setSupportPage(1); }}
+                        className="border border-gray-300 bg-white text-gray-800 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
+                    >
+                        <option value="all">All</option>
+                        <option value="open">Open</option>
+                        <option value="closed">Closed</option>
+                    </select>
+                </label>
+                <label className="flex items-center gap-2">Sort:
+                    <select
+                        value={supportSortOrder}
+                        onChange={e => { setSupportSortOrder(e.target.value); setSupportPage(1); }}
+                        className="border border-gray-300 bg-white text-gray-800 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
+                    >
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                    </select>
+                </label>
+                <label className="flex items-center gap-2 ml-auto">Show:
+                    <select
+                        value={supportEntries}
+                        onChange={e => { setSupportEntries(Number(e.target.value)); setSupportPage(1); }}
+                        className="border border-gray-300 bg-white text-gray-800 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
+                    >
+                        <option value={5}>5</option>
+                        <option value={10}>10</option>
+                        <option value={25}>25</option>
+                    </select> Rows
+                </label>
             </div>
-            {/* Table */}
             <div className="overflow-x-auto rounded-lg border">
                 <table className="w-full text-left text-sm">
                     <thead className="bg-gray-50">
@@ -498,7 +563,6 @@ export default function CustomerView({ initialSection = 'overview' }) {
                     </tbody>
                 </table>
             </div>
-            {/* Pagination */}
             <div className="flex flex-wrap justify-between items-center mt-4 gap-4">
                 <span className="text-sm">Page {supportPage} of {Math.max(1, Math.ceil(filteredTickets.length / supportEntries))}</span>
                 <div className="flex space-x-2">
@@ -529,7 +593,7 @@ export default function CustomerView({ initialSection = 'overview' }) {
             <div id="billing-section" className="glassmorphism rounded-2xl p-8 border border-white/20 bg-white">
                 <div className="flex flex-wrap items-center gap-4 mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 mr-auto">Billing & Invoices</h2>
-                    <label className="text-sm flex items-center gap-2">Status: <select className="border rounded p-1" value={statusFilter} onChange={e=> setStatusFilter(e.target.value)}><option value="all">All</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="overdue">Overdue</option></select></label>
+                    <label className="text-sm flex items-center gap-2">Status: <select className="border rounded p-1 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40" value={statusFilter} onChange={e=> setStatusFilter(e.target.value)}><option value="all">All</option><option value="paid">Paid</option><option value="pending">Pending</option><option value="overdue">Overdue</option></select></label>
                     <button onClick={refetchInvoices} className="text-sm px-3 py-1.5 rounded-md bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50" disabled={invoiceLoading}>Refresh</button>
                     <button onClick={downloadCSV} className="text-sm px-3 py-1.5 rounded-md bg-gray-700 text-white hover:bg-gray-800">Export CSV</button>
                 </div>
@@ -587,8 +651,8 @@ export default function CustomerView({ initialSection = 'overview' }) {
             <div id="orders-section" className="glassmorphism rounded-2xl p-8 border border-white/20 bg-white">
                 <div className="flex flex-wrap items-center gap-4 mb-6">
                     <h2 className="text-2xl font-bold text-gray-900 mr-auto">Orders</h2>
-                    <label className="text-sm flex items-center gap-2">Type: <select className="border rounded p-1" value={typeFilter} onChange={e=> setTypeFilter(e.target.value)}><option value="all">All</option><option value="service">Services</option><option value="product">Products</option></select></label>
-                    <label className="text-sm flex items-center gap-2">Status: <select className="border rounded p-1" value={statusFilter} onChange={e=> setStatusFilter(e.target.value)}><option value="all">All</option><option value="active">Active</option><option value="pending">Pending</option><option value="suspended">Suspended</option></select></label>
+                    <label className="text-sm flex items-center gap-2">Type: <select className="border rounded p-1 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40" value={typeFilter} onChange={e=> setTypeFilter(e.target.value)}><option value="all">All</option><option value="service">Services</option><option value="product">Products</option></select></label>
+                    <label className="text-sm flex items-center gap-2">Status: <select className="border rounded p-1 bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40" value={statusFilter} onChange={e=> setStatusFilter(e.target.value)}><option value="all">All</option><option value="active">Active</option><option value="pending">Pending</option><option value="suspended">Suspended</option></select></label>
                     <button onClick={exportCSV} className="text-sm px-3 py-1.5 rounded-md bg-gray-700 text-white hover:bg-gray-800">Export CSV</button>
                 </div>
                 {filtered.length===0 && <div className="py-8 text-gray-500">No orders match current filters.</div>}
@@ -620,9 +684,42 @@ export default function CustomerView({ initialSection = 'overview' }) {
         );
     };
 
+    // Sync activeSection with current /dashboard subroute
+    useEffect(()=> {
+        if(!location.pathname.startsWith('/dashboard')) return;
+        const parts = location.pathname.split('/').filter(Boolean); // ['dashboard','billing']
+        let section = 'overview';
+        if(parts.length >= 2) section = parts[1]; // after 'dashboard'
+        if(!['overview','support','billing','orders','info'].includes(section)) section='overview';
+        setActiveSection(section);
+    }, [location.pathname]);
+
+    // Redirect plain /dashboard to /dashboard/overview to ensure subroute always present
+    useEffect(()=> {
+        if(location.pathname === '/dashboard' || location.pathname === '/dashboard/') {
+            navigate('/dashboard/overview', { replace: true });
+        }
+    }, [location.pathname, navigate]);
+
+    // Scroll target section into view after section changes
+    useEffect(()=> {
+        const ids = { support:'support-section', billing:'billing-section', orders:'orders-section' };
+        const id = ids[activeSection];
+        if(id) setTimeout(()=> { const el = document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth'}); }, 80);
+    }, [activeSection]);
+
     return (
         <div className="flex h-screen overflow-hidden">
-            <Sidebar />
+            <CustomerSidebar
+                userName={userName}
+                openTicketCount={openTicketCount}
+                current={activeSection}
+                onLogout={handleLogout}
+                onSelectSection={(section) => {
+                    const route = section === 'overview' ? '/dashboard/overview' : `/dashboard/${section}`;
+                    navigate(route);
+                }}
+            />
             <main className="flex-1 overflow-y-auto bg-gray-50">
                 <Header />
                 <div className="p-8 space-y-8">
