@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useLayoutEffect } from 'react';
 import './customerview.style.css';
 import { Briefcase, LifeBuoy, Bell, Plus, ChevronDown, Server, Database, HardDrive, AlertTriangle, FileText, ArrowUp, ArrowDown, Minus, ShoppingCart } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -25,6 +25,10 @@ export default function CustomerView({ initialSection = 'overview' }) {
     const [supportEntries, setSupportEntries] = useState(10);
     const [supportStatusFilter, setSupportStatusFilter] = useState('all');
     const [supportSortOrder, setSupportSortOrder] = useState('newest');
+    // Focus preservation refs for ticket textarea
+    const ticketTextareaRef = useRef(null);
+    const ticketSelectionRef = useRef({ start: null, end: null });
+    const ticketHadFocusRef = useRef(false);
 
     // Helper to color support ticket status badges (restored)
     const getStatusColor = (status) => {
@@ -469,35 +473,45 @@ export default function CustomerView({ initialSection = 'overview' }) {
             <div className="mb-6">
                 <h3 className="text-lg font-semibold mb-2">Submit a Ticket</h3>
                 <textarea
-                    className="w-full border border-gray-300 bg-white text-gray-800 placeholder-gray-400 rounded-md p-3 resize-y shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
+                    ref={ticketTextareaRef}
+                    className="support-ticket-input w-full border border-gray-300 bg-white text-gray-800 placeholder-gray-400 rounded-md p-3 resize-y shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 transition"
                     rows={4}
                     placeholder="Describe your issue..."
+                    dir="ltr"
+                    style={{direction:'ltr'}}
                     value={ticketDescription}
-                    onChange={e => setTicketDescription(e.target.value)}
+                    onFocus={() => { ticketHadFocusRef.current = true; }}
+                    onBlur={() => { ticketHadFocusRef.current = false; }}
+                    onChange={e => {
+                        const el = e.target;
+                        ticketSelectionRef.current = { start: el.selectionStart, end: el.selectionEnd };
+                        setTicketDescription(el.value);
+                    }}
                 />
                 <div className="mt-2 flex justify-end">
                     <button
                         disabled={!ticketDescription.trim()}
                         className="bg-blue-600 disabled:opacity-50 text-white px-4 py-2 rounded-md flex items-center gap-2 shadow hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500/40 transition"
                         onClick={() => {
+                            const currentVal = ticketDescription;
+                            if(!currentVal.trim()) return;
                             const submit = async () => {
                                 try {
                                     const res = await fetch('/api/support-ticket', {
                                         method: 'POST',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ customerId: customerDbId, issue: ticketDescription })
+                                        body: JSON.stringify({ customerId: customerDbId, issue: currentVal })
                                     });
                                     const result = await res.json();
                                     if (result && result.ticket) {
                                         const t = result.ticket;
                                         const mapped = { id: t._id, description: t.issue, status: t.status, createdAt: t.createdAt };
-                                        setTickets([mapped, ...tickets]);
+                                        setTickets(prev => [mapped, ...prev]);
                                         setTicketDescription('');
                                         setSupportPage(1);
+                                        requestAnimationFrame(()=> { ticketTextareaRef.current?.focus(); });
                                     }
-                                } catch (err) {
-                                    console.error(err);
-                                }
+                                } catch (err) { console.error(err); }
                             };
                             submit();
                         }}
@@ -707,6 +721,19 @@ export default function CustomerView({ initialSection = 'overview' }) {
         const id = ids[activeSection];
         if(id) setTimeout(()=> { const el = document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth'}); }, 80);
     }, [activeSection]);
+
+    // Focus preservation for support ticket textarea
+    useLayoutEffect(() => {
+        if (activeSection !== 'support') return;
+        if (!ticketHadFocusRef.current) return;
+        const el = ticketTextareaRef.current;
+        if (!el) return;
+        if (document.activeElement !== el) el.focus();
+        const { start, end } = ticketSelectionRef.current;
+        if (start !== null && end !== null) {
+            try { el.setSelectionRange(start, end); } catch {}
+        }
+    }, [ticketDescription]);
 
     return (
         <div className="flex h-screen overflow-hidden">
