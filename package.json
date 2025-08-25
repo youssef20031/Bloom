@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "nodemon src/server/main.js -w src/server",
+    "dev": "cross-env KAFKA_BROKERS=localhost:9092 nodemon src/server/main.js -w src/server",
     "start": "cross-env NODE_ENV=production node src/server/main.js",
     "build": "vite build",
     "test": "jest",
@@ -12,7 +12,9 @@
     "serve:ai": "python src/ai_service/ai_service.py",
     "install:ai": "pip install --no-cache-dir --break-system-packages -r src/ai_service/requirements.txt",
     "setup": "npm install && npm run install:ai",
-    "start:both": "npx concurrently \"npm run dev\" \"npm run serve:ai\""
+    "start:both": "npm run kafka:up && cross-env KAFKA_BROKERS=localhost:9092 concurrently \"npm run dev\" \"npm run serve:ai\"",
+    "kafka:up": "docker compose up -d kafka zookeeper || docker-compose up -d kafka zookeeper",
+    "kafka:down": "docker compose down || docker-compose down"
   },
   "dependencies": {
     "axios": "^1.11.0",
@@ -21,6 +23,7 @@
     "cross-env": "^7.0.3",
     "dotenv": "^17.2.1",
     "express": "^5.1.0",
+    "kafkajs": "^2.2.4",
     "lucide-react": "^0.540.0",
     "mongoose": "^8.17.2",
     "mqtt": "^5.14.0",

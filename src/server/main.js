@@ -16,6 +16,7 @@ import customerRoutes from "./routes/customer.js";
 import cors from "cors";
 import chatRoutes from "./routes/chatBot.js";
 import requestChangeRoutes from './routes/requestChange.js';
+import { initKafka, isKafkaEnabled, shutdownKafka } from './kafka/index.js';
 
 
 dotenv.config();
@@ -34,6 +35,9 @@ const io = new Server(server, {
 // Set the io instance for AlertService to use
 setIo(io);
 
+// Initialize Kafka (non-blocking). If env vars absent it will no-op.
+(async () => { await initKafka(); })();
+
 // Middleware
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -51,7 +55,6 @@ mongoose.connect(MONGO_URI)
 app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
 });
-
 
 // User routes
 app.use("/api/users", user);
@@ -78,6 +81,15 @@ app.use('/api/support-ticket', supportTicketRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/request-change', requestChangeRoutes);
 
+app.get('/api/health', async (req, res) => {
+  const mongoConnected = mongoose.connection.readyState === 1;
+  res.json({
+    status: 'ok',
+    mongoConnected,
+    kafkaEnabled: isKafkaEnabled(),
+    timestamp: new Date().toISOString()
+  });
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -151,7 +163,7 @@ process.on('SIGINT', async () => {
   } catch (err) {
     console.error('❌ Error closing MongoDB connection:', err);
   }
-  
+  await shutdownKafka();
   process.exit(0);
 });
 
@@ -172,6 +184,6 @@ process.on('SIGTERM', async () => {
   } catch (err) {
     console.error('❌ Error closing MongoDB connection:', err);
   }
-  
+  await shutdownKafka();
   process.exit(0);
 });

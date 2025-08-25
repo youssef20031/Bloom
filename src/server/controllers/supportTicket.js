@@ -1,6 +1,7 @@
 import SupportTicket from '../models/supportTicket.js';
 import Customer from '../models/customer.js';
 import User from '../models/user.js';
+import { produceKafkaEvent } from '../kafka/index.js';
 
 // Create a new support ticket
 export const createSupportTicket = async (req, res) => {
@@ -30,6 +31,16 @@ export const createSupportTicket = async (req, res) => {
         });
 
         await supportTicket.save();
+        // Produce Kafka event
+        produceKafkaEvent('support-ticket-events', supportTicket._id, {
+            type: 'support.ticket.created',
+            ticketId: supportTicket._id,
+            issue: supportTicket.issue,
+            priority: supportTicket.priority,
+            status: supportTicket.status,
+            customerId: supportTicket.customerId,
+            timestamp: new Date().toISOString()
+        });
         res.status(201).json({ message: 'Support ticket created successfully', ticket: supportTicket });
     } catch (error) {
         res.status(500).json({ message: 'Internal server error', error: error.message });
@@ -67,6 +78,13 @@ export const addTicketMessage = async (req, res) => {
 
         ticket.history.push({ message, author: authorId, timestamp: new Date() });
         await ticket.save();
+        produceKafkaEvent('support-ticket-events', ticket._id, {
+            type: 'support.ticket.message_added',
+            ticketId: ticket._id,
+            message,
+            authorId,
+            timestamp: new Date().toISOString()
+        });
         res.json({ message: 'Message added successfully', ticket });
     } catch (error) {
         res.status(500).json({ message: 'Internal server error', error: error.message });
@@ -101,7 +119,12 @@ export const updateTicketStatus = async (req, res) => {
 
         const ticket = await SupportTicket.findByIdAndUpdate(ticketId, { status }, { new: true });
         if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
-
+        produceKafkaEvent('support-ticket-events', ticket._id, {
+            type: 'support.ticket.status_updated',
+            ticketId: ticket._id,
+            status: ticket.status,
+            timestamp: new Date().toISOString()
+        });
         res.json({ message: 'Status updated', ticket });
     } catch (error) {
         res.status(500).json({ message: 'Internal server error', error: error.message });
@@ -122,6 +145,12 @@ export const assignSupportAgent = async (req, res) => {
             .populate('supportAgentId', 'name email');
 
         if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
+        produceKafkaEvent('support-ticket-events', ticket._id, {
+            type: 'support.ticket.assigned',
+            ticketId: ticket._id,
+            supportAgentId: ticket.supportAgentId?._id || ticket.supportAgentId,
+            timestamp: new Date().toISOString()
+        });
         res.json({ message: 'Agent assigned', ticket });
     } catch (error) {
         res.status(500).json({ message: 'Internal server error', error: error.message });
@@ -134,6 +163,11 @@ export const deleteSupportTicket = async (req, res) => {
         const { ticketId } = req.params;
         const ticket = await SupportTicket.findByIdAndDelete(ticketId);
         if (!ticket) return res.status(404).json({ message: 'Support ticket not found' });
+        produceKafkaEvent('support-ticket-events', ticket._id, {
+            type: 'support.ticket.deleted',
+            ticketId: ticket._id,
+            timestamp: new Date().toISOString()
+        });
         res.json({ message: 'Support ticket deleted' });
     } catch (error) {
         res.status(500).json({ message: 'Internal server error', error: error.message });
