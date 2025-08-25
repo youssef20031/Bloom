@@ -52,6 +52,10 @@ app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
 });
 
+// Middleware to parse JSON requests
+app.use(express.json());
+app.use(express.urlencoded({ extended: true })); // Add this line
+
 
 // User routes
 app.use("/api/users", user);
@@ -76,7 +80,6 @@ app.use('/api/support-ticket', supportTicketRoutes);
 
 
 app.use('/api/chat', chatRoutes);
-app.use('/api/request-change', requestChangeRoutes);
 
 
 // Error handling middleware
@@ -133,17 +136,17 @@ server.listen(PORT, () => {
 // Graceful shutdown handling
 process.on('SIGINT', async () => {
   console.log('\n🛑 Received SIGINT. Graceful shutdown...');
-  
+
   // Close server
   server.close(() => {
     console.log('🔌 HTTP server closed');
   });
-  
+
   // Close WebSocket
   io.close(() => {
     console.log('📡 WebSocket server closed');
   });
-  
+
   // Close MongoDB connection
   try {
     await mongoose.connection.close();
@@ -151,27 +154,27 @@ process.on('SIGINT', async () => {
   } catch (err) {
     console.error('❌ Error closing MongoDB connection:', err);
   }
-  
+
   process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
   console.log('🛑 Received SIGTERM. Graceful shutdown...');
-  
+
   server.close(() => {
     console.log('🔌 HTTP server closed');
   });
-  
+
   io.close(() => {
     console.log('📡 WebSocket server closed');
   });
-  
+
   try {
     await mongoose.connection.close();
     console.log('💾 MongoDB connection closed');
   } catch (err) {
     console.error('❌ Error closing MongoDB connection:', err);
   }
-  
+
   process.exit(0);
 });

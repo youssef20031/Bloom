@@ -1,61 +1,41 @@
-
-import React, { useState } from 'react'
-import './support.css'
+import React, { useState, useEffect } from 'react';
+import './support.css';
+import { listSupportTickets, getSupportTicket, updateTicketStatus, submitChangeRequest } from '../../api/supportApi';
 
 export default function App() {
-    const [currentPage, setCurrentPage] = useState(1)
-    const [showEntries, setShowEntries] = useState(10)
-    const [statusFilter, setStatusFilter] = useState('all')
-    const [sortOrder, setSortOrder] = useState('newest')
+    const [tickets, setTickets] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [currentPage, setCurrentPage] = useState(1);
+    const [showEntries, setShowEntries] = useState(10);
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [sortOrder, setSortOrder] = useState('newest');
+    const [selectedTicketId, setSelectedTicketId] = useState(null);
+    const [ticketDetails, setTicketDetails] = useState(null);
+    const [showDetailsModal, setShowDetailsModal] = useState(false);
+    const [detailsLoading, setDetailsLoading] = useState(false);
+    const [detailsError, setDetailsError] = useState(null);
 
-    const tickets = [
-        { _id: 'TK0001', subject: 'Backup restore failed', status: 'open', createdAt: '2024-03-08', customer: { _id: 'CUST001', name: 'Navy', email: 'helpdesk@navy.com' }},
-        { _id: 'TK0002', subject: 'Email delivery failure', status: 'open', createdAt: '2023-12-30', customer: { _id: 'CUST002', name: 'Siemens', email: 'support@siemens.com' }},
-        { _id: 'TK0003', subject: 'Security patch installation', status: 'close', createdAt: '2024-11-09', customer: { _id: 'CUST003', name: 'Stripe', email: 'info@stripe.com' }},
-        { _id: 'TK0004', subject: '5G network problem', status: 'close', createdAt: '2025-10-11', customer: { _id: 'CUST004', name: 'Tesla', email: 'helpdesk@tesla.com' }},
-        { _id: 'TK0005', subject: 'Payment declined', status: 'open', createdAt: '2023-04-24', customer: { _id: 'CUST005', name: 'Lenovo', email: 'tech@lenovo.com' }},
-        { _id: 'TK0006', subject: 'System integration issues', status: 'open', createdAt: '2025-07-03', customer: { _id: 'CUST006', name: 'Amazon', email: 'helpdesk@amazon.com' }},
-        { _id: 'TK0007', subject: 'System monitoring alerts', status: 'open', createdAt: '2025-01-08', customer: { _id: 'CUST007', name: 'Philips', email: 'helpdesk@philips.com' }},
-        { _id: 'TK0008', subject: 'Printer not connecting', status: 'close', createdAt: '2025-10-01', customer: { _id: 'CUST008', name: 'Accenture', email: 'helpdesk@accenture.com' }},
-        { _id: 'TK0009', subject: 'VPN authentication failure', status: 'open', createdAt: '2024-10-13', customer: { _id: 'CUST009', name: 'Microsoft', email: 'tech@microsoft.com' }},
-        { _id: 'TK0010', subject: 'Cloud function timeout', status: 'close', createdAt: '2024-12-10', customer: { _id: 'CUST010', name: 'Twitter', email: 'helpdesk@twitter.com' }},
-        { _id: 'TK0011', subject: 'System monitoring alerts', status: 'open', createdAt: '2025-12-16', customer: { _id: 'CUST011', name: 'Airbnb', email: 'support@airbnb.com' }},
-        { _id: 'TK0012', subject: 'Security patch installation', status: 'close', createdAt: '2025-06-08', customer: { _id: 'CUST012', name: 'Siemens', email: 'support@siemens.com' }},
-        { _id: 'TK0013', subject: 'Security patch installation', status: 'open', createdAt: '2025-02-10', customer: { _id: 'CUST013', name: 'Hitachi', email: 'tech@hitachi.com' }},
-        { _id: 'TK0014', subject: 'DNS propagation delay', status: 'open', createdAt: '2024-04-07', customer: { _id: 'CUST014', name: 'Lenovo', email: 'info@lenovo.com' }},
-        { _id: 'TK0015', subject: 'Load balancer error', status: 'close', createdAt: '2024-09-22', customer: { _id: 'CUST015', name: 'Etihad', email: 'info@etihad.com' }},
-        { _id: 'TK0016', subject: 'Printer not connecting', status: 'open', createdAt: '2025-02-26', customer: { _id: 'CUST016', name: 'Samsung', email: 'helpdesk@samsung.com' }},
-        { _id: 'TK0017', subject: 'Payment gateway timeout issue', status: 'close', createdAt: '2025-05-02', customer: { _id: 'CUST017', name: 'GE Healthcare', email: 'info@gehealthcare.com' }},
-        { _id: 'TK0018', subject: 'DNS propagation delay', status: 'close', createdAt: '2024-01-27', customer: { _id: 'CUST018', name: 'Hitachi', email: 'support@hitachi.com' }},
-        { _id: 'TK0019', subject: 'SSL certificate renewal reminder', status: 'close', createdAt: '2023-11-24', customer: { _id: 'CUST019', name: 'Google', email: 'support@google.com' }},
-        { _id: 'TK0020', subject: 'Repository access issue', status: 'close', createdAt: '2025-03-19', customer: { _id: 'CUST020', name: 'Norton', email: 'info@norton.com' }},
-        { _id: 'TK0021', subject: 'Cloud storage latency', status: 'close', createdAt: '2025-02-14', customer: { _id: 'CUST021', name: 'HSBC', email: 'support@hsbc.com' }},
-        { _id: 'TK0022', subject: 'Database replication lag observed', status: 'open', createdAt: '2024-10-11', customer: { _id: 'CUST022', name: 'BMW', email: 'helpdesk@bmw.com' }},
-        { _id: 'TK0023', subject: 'Cloud storage latency', status: 'close', createdAt: '2023-07-03', customer: { _id: 'CUST023', name: 'LG', email: 'support@lg.com' }},
-        { _id: 'TK0024', subject: 'ETL job failed', status: 'close', createdAt: '2025-10-27', customer: { _id: 'CUST024', name: 'Zoom', email: 'support@zoom.com' }},
-        { _id: 'TK0025', subject: 'AI Chatbot configuration assistance', status: 'open', createdAt: '2024-01-06', customer: { _id: 'CUST025', name: 'Bosch', email: 'support@bosch.com' }},
-        { _id: 'TK0026', subject: 'Video buffering', status: 'close', createdAt: '2025-07-20', customer: { _id: 'CUST026', name: 'Dropbox', email: 'support@dropbox.com' }},
-        { _id: 'TK0027', subject: 'Backup restore failed', status: 'open', createdAt: '2024-07-23', customer: { _id: 'CUST027', name: 'Siemens', email: 'info@siemens.com' }},
-        { _id: 'TK0028', subject: 'Mobile app crash report', status: 'open', createdAt: '2024-04-12', customer: { _id: 'CUST028', name: 'TikTok', email: 'support@tiktok.com' }},
-        { _id: 'TK0029', subject: 'Hosting downtime issue', status: 'open', createdAt: '2023-09-12', customer: { _id: 'CUST029', name: 'General Motors', email: 'helpdesk@generalmotors.com' }},
-        { _id: 'TK0030', subject: 'Load testing error', status: 'close', createdAt: '2025-09-26', customer: { _id: 'CUST030', name: 'FedEx', email: 'tech@fedex.com' }},
-        { _id: 'TK0031', subject: 'Storage quota exceeded', status: 'close', createdAt: '2025-10-14', customer: { _id: 'CUST031', name: 'Shell', email: 'helpdesk@shell.com' }},
-        { _id: 'TK0032', subject: 'Delay in SMS notifications', status: 'open', createdAt: '2025-01-04', customer: { _id: 'CUST032', name: '3M', email: 'support@3m.com' }},
-        { _id: 'TK0033', subject: 'Cloud function timeout', status: 'open', createdAt: '2024-12-26', customer: { _id: 'CUST033', name: 'Qatar Airways', email: 'support@qatarairways.com' }},
-        { _id: 'TK0034', subject: 'Cloud function timeout', status: 'close', createdAt: '2024-01-05', customer: { _id: 'CUST034', name: 'Qatar Airways', email: 'tech@qatarairways.com' }},
-        { _id: 'TK0035', subject: 'DNS propagation delay', status: 'close', createdAt: '2023-08-02', customer: { _id: 'CUST035', name: 'Microsoft', email: 'tech@microsoft.com' }},
-        { _id: 'TK0036', subject: 'Firewall rules misconfiguration', status: 'close', createdAt: '2025-03-21', customer: { _id: 'CUST036', name: 'Malaysia Airlines', email: 'tech@malaysiaairlines.com' }},
-        { _id: 'TK0037', subject: 'Cloud function timeout', status: 'close', createdAt: '2023-12-06', customer: { _id: 'CUST037', name: 'El-Swedy', email: 'tech@el-swedy.com' }},
-        { _id: 'TK0038', subject: 'ETL job failed', status: 'open', createdAt: '2025-09-25', customer: { _id: 'CUST038', name: 'Pepsi', email: 'helpdesk@pepsi.com' }},
-        { _id: 'TK0039', subject: 'System integration issues', status: 'close', createdAt: '2025-11-18', customer: { _id: 'CUST039', name: 'ByteDance', email: 'tech@bytedance.com' }},
-        { _id: 'TK0040', subject: 'DNS propagation delay', status: 'close', createdAt: '2025-10-01', customer: { _id: 'CUST040', name: 'Siemens', email: 'tech@siemens.com' }},
-        { _id: 'TK0041', subject: 'Payment gateway timeout issue', status: 'close', createdAt: '2025-06-19', customer: { _id: 'CUST041', name: 'Siemens Health', email: 'helpdesk@siemenshealth.com' }},
-        { _id: 'TK0042', subject: '5G network problem', status: 'open', createdAt: '2025-05-18', customer: { _id: 'CUST042', name: 'ProcterGamble', email: 'helpdesk@proctergamble.com' }},
-        { _id: 'TK0043', subject: 'Ransomware prevention query', status: 'open', createdAt: '2025-11-11', customer: { _id: 'CUST043', name: 'Malaysia Airlines', email: 'helpdesk@malaysiaairlines.com' }},
-        { _id: 'TK0044', subject: 'System monitoring alerts', status: 'close', createdAt: '2025-09-13', customer: { _id: 'CUST044', name: 'Unilever', email: 'info@unilever.com' }},
-        { _id: 'TK0045', subject: 'Cloud storage latency', status: 'close', createdAt: '2023-07-09', customer: { _id: 'CUST045', name: 'Uber', email: 'info@uber.com' }},
-        { _id: 'TK0046', subject: 'Cloud function timeout', status: 'open', createdAt: '2023-10-11', customer: { _id: 'CUST046', name: 'Accenture', email: 'helpdesk@accenture.com' }}
-    ]
+    // Add state for change request modal and form fields
+    const [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
+    const [changeRequestTag, setChangeRequestTag] = useState('');
+    const [changeRequestDescription, setChangeRequestDescription] = useState('');
+    const [changeRequestError, setChangeRequestError] = useState('');
+    const [changeRequestLoading, setChangeRequestLoading] = useState(false);
+    const [changeRequestSuccess, setChangeRequestSuccess] = useState('');
+
+    useEffect(() => {
+        // Fetch all support tickets from the database
+        listSupportTickets()
+            .then(data => {
+                setTickets(data);
+                setLoading(false);
+            })
+            .catch(err => {
+                setError(err.message);
+                setLoading(false);
+            });
+    }, []);
 
     const getStatusColor = (status) => {
         switch (status.toLowerCase()) {
@@ -89,12 +69,42 @@ export default function App() {
     </span>
     )
 
+    const handleTicketIdClick = async (ticketId) => {
+        setSelectedTicketId(ticketId);
+        setShowDetailsModal(true);
+        setDetailsLoading(true);
+        setDetailsError(null);
+        try {
+            const details = await getSupportTicket(ticketId);
+            setTicketDetails(details);
+        } catch (err) {
+            setDetailsError(err.message);
+        }
+        setDetailsLoading(false);
+    };
+
+    const handleStatusChange = async (newStatus) => {
+        if (!selectedTicketId) return;
+        setDetailsLoading(true);
+        setDetailsError(null);
+        try {
+            const updated = await updateTicketStatus(selectedTicketId, newStatus);
+            setTicketDetails(updated.ticket);
+            // Optionally update main ticket list
+            setTickets(tickets.map(t => t._id === selectedTicketId ? updated.ticket : t));
+        } catch (err) {
+            setDetailsError(err.message);
+        }
+        setDetailsLoading(false);
+    };
+
     // Filter and sort tickets
     const filteredAndSortedTickets = tickets
         .filter(ticket => {
             if (statusFilter === 'all') return true
             if (statusFilter === 'open') return ticket.status === 'open'
-            if (statusFilter === 'closed') return ticket.status === 'close'
+            if (statusFilter === 'in_progress') return ticket.status === 'in_progress'
+            if (statusFilter === 'closed') return ticket.status === 'closed'
             return true
         })
         .sort((a, b) => {
@@ -106,6 +116,41 @@ export default function App() {
                 return dateA - dateB
             }
         })
+
+    if (loading) return <div>Loading support tickets...</div>;
+    if (error) return <div>Error: {error}</div>;
+
+    // Status options and colors
+    const statusOptions = [
+        { value: 'open', label: 'Open', color: '#28a745' },
+        { value: 'in_progress', label: 'In Progress', color: '#17a2b8' },
+        { value: 'closed', label: 'Closed', color: '#dc3545' }
+    ];
+
+    // Handler for sending change request
+    const handleSendChangeRequest = async () => {
+        if (!changeRequestTag) {
+            setChangeRequestError('Tag is required.');
+            return;
+        }
+        setChangeRequestLoading(true);
+        setChangeRequestError('');
+        setChangeRequestSuccess('');
+        try {
+            // Use a valid user ID from your database here
+            await submitChangeRequest(ticketDetails._id, changeRequestTag.toLowerCase(), changeRequestDescription, '64e7b2f8c2a1e2d4f8a12345');
+            setChangeRequestSuccess('Change request sent successfully!');
+            // Refresh ticket details to show new message
+            const updatedDetails = await getSupportTicket(ticketDetails._id);
+            setTicketDetails(updatedDetails);
+            setShowChangeRequestModal(false);
+            setChangeRequestTag('');
+            setChangeRequestDescription('');
+        } catch (err) {
+            setChangeRequestError(err.message || 'Failed to send change request');
+        }
+        setChangeRequestLoading(false);
+    };
 
     return (
         <div className="app">
@@ -145,6 +190,7 @@ export default function App() {
                         >
                             <option value="all">All</option>
                             <option value="open">Open</option>
+                            <option value="in_progress">In Progress</option>
                             <option value="closed">Closed</option>
                         </select>
                     </div>
@@ -181,14 +227,18 @@ export default function App() {
                         <tbody>
                         {filteredAndSortedTickets.slice((currentPage - 1) * showEntries, currentPage * showEntries).map(ticket => (
                             <tr key={ticket._id}>
-                                <td className="ticket-id">{ticket._id}</td>
-                                <td className="subject-text">{ticket.subject}</td>
+                                <td className="ticket-id">
+                                    <button style={{background:'none',border:'none',color:'#007bff',cursor:'pointer',textDecoration:'underline'}} onClick={() => handleTicketIdClick(ticket._id)}>
+                                        {ticket._id}
+                                    </button>
+                                </td>
+                                <td className="subject-text">{ticket.issue}</td>
                                 <td>
-                                    <StatusBadge status={ticket.status === 'close' ? 'closed' : ticket.status} />
+                                    <StatusBadge status={ticket.status === 'closed' ? 'closed' : ticket.status} />
                                 </td>
                                 <td className="created-at">{new Date(ticket.createdAt).toLocaleDateString()}</td>
-                                <td className="customer-name">{ticket.customer.name}</td>
-                                <td className="customer-email">{ticket.customer.email}</td>
+                                <td className="customer-name">{ticket.customerId?.companyName || ''}</td>
+                                <td className="customer-email">{ticket.customerId?.email || ''}</td>
                             </tr>
                         ))}
                         </tbody>
@@ -242,6 +292,107 @@ export default function App() {
                     </div>
                 </div>
             </main>
+
+            {/* Ticket Details Modal */}
+            {showDetailsModal && (
+                <div className="modal-overlay" style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:1000}}>
+                    <div className="modal-content" style={{background:'#fff',padding:'2rem',borderRadius:'8px',maxWidth:'600px',margin:'5% auto',position:'relative'}}>
+                        <button style={{position:'absolute',top:'1rem',right:'1rem',fontSize:'1.5rem',background:'none',border:'none',cursor:'pointer'}} onClick={()=>{setShowDetailsModal(false);setTicketDetails(null);setSelectedTicketId(null);}}>&times;</button>
+                        {detailsLoading ? <div>Loading...</div> : detailsError ? <div>Error: {detailsError}</div> : ticketDetails && (
+                            <div>
+                                <h2>Ticket Details</h2>
+                                <p><strong>ID:</strong> {ticketDetails._id}</p>
+                                <p><strong>Issue:</strong> {ticketDetails.issue}</p>
+                                <p><strong>Status:</strong> <StatusBadge status={ticketDetails.status} /></p>
+                                <p><strong>Priority:</strong> {ticketDetails.priority}</p>
+                                <p><strong>Created At:</strong> {new Date(ticketDetails.createdAt).toLocaleString()}</p>
+                                <p><strong>Customer:</strong> {ticketDetails.customerId?.companyName} ({ticketDetails.customerId?.contactPerson})</p>
+                                <p><strong>Support Agent:</strong> {ticketDetails.supportAgentId?.name || 'Unassigned'}</p>
+                                <div style={{margin:'1rem 0'}}>
+                                    <label htmlFor="status-select"><strong>Change Status:</strong></label>
+                                    <div style={{marginTop:'0.5rem'}}>
+                                        {statusOptions.map(opt => (
+                                            <button
+                                                key={opt.value}
+                                                onClick={() => handleStatusChange(opt.value)}
+                                                style={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    marginRight: '1rem',
+                                                    padding: '6px 16px',
+                                                    borderRadius: '16px',
+                                                    border: ticketDetails.status === opt.value ? '2px solid #333' : '1px solid #ccc',
+                                                    background: opt.color,
+                                                    color: '#fff',
+                                                    fontWeight: ticketDetails.status === opt.value ? 'bold' : 'normal',
+                                                    cursor: 'pointer',
+                                                    boxShadow: ticketDetails.status === opt.value ? '0 0 4px #333' : 'none',
+                                                    outline: 'none'
+                                                }}
+                                            >
+                                                <span style={{width:16,height:16,display:'inline-block',borderRadius:'50%',background:opt.color,marginRight:8,border:'2px solid #fff'}}></span>
+                                                {opt.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Add Change Request button for Open tickets */}
+                                {ticketDetails.status === 'in_progress' && (
+                                    <button
+                                        style={{marginTop:'1rem',padding:'8px 20px',borderRadius:'8px',background:'#6366f1',color:'#fff',fontWeight:'bold',border:'none',cursor:'pointer'}}
+                                        onClick={() => {
+                                            setChangeRequestTag('');
+                                            setChangeRequestDescription('');
+                                            setShowChangeRequestModal(true);
+                                        }}
+                                    >
+                                        Change Request
+                                    </button>
+                                )}
+                                {/* Change Request Modal */}
+                                {showChangeRequestModal && (
+                                    <div className="modal-overlay" style={{position:'fixed',top:0,left:0,right:0,bottom:0,background:'rgba(0,0,0,0.5)',zIndex:1100}}>
+                                        <div className="modal-content" style={{background:'#fff',padding:'2rem',borderRadius:'8px',maxWidth:'400px',margin:'10% auto',position:'relative'}}>
+                                            <button style={{position:'absolute',top:'1rem',right:'1rem',fontSize:'1.5rem',background:'none',border:'none',cursor:'pointer'}} onClick={()=>setShowChangeRequestModal(false)}>&times;</button>
+                                            <h3>Submit Change Request</h3>
+                                            <div style={{margin:'1rem 0'}}>
+                                                <label htmlFor="tag-select"><strong>Tag <span style={{color:'red'}}>*</span>:</strong></label>
+                                                <select id="tag-select" value={changeRequestTag} onChange={e=>setChangeRequestTag(e.target.value)} style={{width:'100%',padding:'8px',marginTop:'0.5rem',borderRadius:'6px',fontWeight:'bold',background:changeRequestTag==='AI'?'#e0f7fa':changeRequestTag==='DC'?'#f3e8ff':'#f8fafc',color:'#333',border:'2px solid #6366f1'}} required>
+                                                    <option value="" style={{background:'#f8fafc',color:'#333'}}>Select Tag</option>
+                                                    <option value="AI" style={{background:'#e0f7fa',color:'#00796b'}}>AI</option>
+                                                    <option value="DC" style={{background:'#f3e8ff',color:'#6d28d9'}}>DC</option>
+                                                </select>
+                                            </div>
+                                            <div style={{margin:'1rem 0'}}>
+                                                <label htmlFor="desc-text"><strong>Description (optional):</strong></label>
+                                                <textarea id="desc-text" value={changeRequestDescription} onChange={e=>setChangeRequestDescription(e.target.value)} style={{width:'100%',padding:'8px',marginTop:'0.5rem',minHeight:'60px',borderRadius:'6px',background:'#f8fafc',border:'2px solid #6366f1',color:'#333',fontSize:'15px'}} placeholder="Describe your change request..." />
+                                            </div>
+                                            {changeRequestLoading && <div style={{color:'#6366f1',marginBottom:'1rem'}}>Sending...</div>}
+                                            {changeRequestError && <div style={{color:'red',marginBottom:'1rem'}}>{changeRequestError}</div>}
+                                            {changeRequestSuccess && <div style={{color:'#16a34a',marginBottom:'1rem'}}>{changeRequestSuccess}</div>}
+                                            <button
+                                                style={{padding:'8px 20px',borderRadius:'8px',background:'#16a34a',color:'#fff',fontWeight:'bold',border:'none',cursor:'pointer'}}
+                                                onClick={handleSendChangeRequest}
+                                                disabled={changeRequestLoading}
+                                            >
+                                                Send Change Request
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+                                <div>
+                                    <h3>History</h3>
+                                    <ul>
+                                        {ticketDetails.history?.map((h,i)=>(
+                                            <li key={i}><strong>{h.author?.name || h.author}:</strong> {h.message} <em>({new Date(h.timestamp).toLocaleString()})</em></li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }
