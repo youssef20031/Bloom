@@ -41,7 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/customers", customerRoutes);
 app.use("/api/support-ticket", supportTicketRoutes); // Use only /api/support-ticket for support tickets
-const MONGO_URI = process.env.MONGO_URI || 'mongodb://localhost:27017/bloom';
+const MONGO_URI = process.env.MONGO_URI;
 
 mongoose.connect(MONGO_URI)
     .then(() => console.log("Successfully connected to MongoDB"))
