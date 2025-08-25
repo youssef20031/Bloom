@@ -6,7 +6,7 @@ let connectionPromise = null;
 // Read optional env overrides
 const envInt = (name, def) => {
   const v = process.env[name];
-  if (!v) return def;
+  if (v === undefined || v === null || v === '') return def;
   const n = parseInt(v, 10);
   return Number.isNaN(n) ? def : n;
 };
@@ -16,12 +16,19 @@ export async function connectWithRetry(uri, options = {}) {
   if (mongoose.connection.readyState === 1) return mongoose.connection;
   if (connectionPromise) return connectionPromise;
 
-  const maxRetries = options.maxRetries ?? envInt('MONGO_MAX_RETRIES', 5);
+  let maxRetries = options.maxRetries ?? envInt('MONGO_MAX_RETRIES', 5);
   const baseDelay = options.baseDelay ?? envInt('MONGO_RETRY_BASE_MS', 500); // ms
   const factor = options.factor ?? Number(process.env.MONGO_RETRY_FACTOR || 1.8);
   const maxDelay = options.maxDelay ?? envInt('MONGO_MAX_DELAY_MS', 5000);
+  const alwaysRetryServerSelection = options.alwaysRetryServerSelection ?? true;
+  const jitterPct = options.jitterPct ?? Number(process.env.MONGO_RETRY_JITTER_PCT || 0.2); // 0.2 = ±20%
+
+  if (maxRetries <= 0) {
+    console.warn(`⚠️ maxRetries (${maxRetries}) <= 0 supplied; forcing to 1 so there is at least one attempt.`);
+    maxRetries = 1;
+  }
+
   const mongooseOptions = {
-    // Sensible defaults; can be overridden via options.mongooseOptions
     autoIndex: false,
     serverSelectionTimeoutMS: 8000,
     maxPoolSize: 10,
@@ -29,6 +36,8 @@ export async function connectWithRetry(uri, options = {}) {
     retryWrites: true,
     ...options.mongooseOptions,
   };
+
+  console.log(`ℹ️ Mongo connect config -> maxRetries=${maxRetries} baseDelay=${baseDelay} factor=${factor} maxDelay=${maxDelay} jitterPct=${jitterPct} alwaysRetryServerSelection=${alwaysRetryServerSelection}`);
 
   let attempt = 0;
 
@@ -42,13 +51,21 @@ export async function connectWithRetry(uri, options = {}) {
       console.log(`✅ MongoDB connected after attempt ${attempt} in ${ms} ms`);
       return mongoose.connection;
     } catch (err) {
-      const transient = isTransient(err);
-      if (attempt > maxRetries || !transient) {
-        console.error(`❌ MongoDB connection failed (attempt ${attempt}). No more retries.`, err);
+      connectionPromise = null;
+      const transient = isTransient(err, { alwaysRetryServerSelection });
+      console.warn(`🔍 Mongo connect failure classification attempt=${attempt} name=${err?.name} transient=${transient} message='${trimMsg(err?.message)}'`);
+      if (!transient) {
+        console.error(`❌ Non-transient MongoDB connection error (attempt ${attempt}) – aborting retries.`);
         throw err;
       }
-      const delay = Math.min(baseDelay * Math.pow(factor, attempt - 1), maxDelay);
-      console.warn(`⚠️ MongoDB connect attempt ${attempt} failed: ${err.message}. Retrying in ${delay} ms (${attempt}/${maxRetries})`);
+      if (attempt >= maxRetries) {
+        console.error(`❌ MongoDB connection failed (attempt ${attempt}). Exhausted ${maxRetries} retries.`);
+        throw err;
+      }
+      const expDelay = Math.min(baseDelay * Math.pow(factor, attempt - 1), maxDelay);
+      const jitter = expDelay * jitterPct * (Math.random() * 2 - 1); // +/- jitterPct
+      const delay = Math.max(50, Math.round(expDelay + jitter));
+      console.warn(`⚠️ Transient MongoDB connect failure attempt ${attempt}/${maxRetries}. Retrying in ${delay} ms`);
       await new Promise(r => setTimeout(r, delay));
       return attemptConnect();
     }
@@ -57,17 +74,32 @@ export async function connectWithRetry(uri, options = {}) {
   return attemptConnect();
 }
 
-function isTransient(err) {
+function isTransient(err, { alwaysRetryServerSelection }) {
   if (!err) return true;
+  const name = err.name || '';
   const msg = err.message || '';
-  // Basic heuristics; extend as needed
-  return /(ECONNREFUSED|ENOTFOUND|ETIMEDOUT|EAI_AGAIN|ServerSelectionError|TopologyClosed|network error)/i.test(msg);
+  if (alwaysRetryServerSelection && name === 'MongooseServerSelectionError') return true;
+  const patterns = [
+    /ECONNREFUSED/i,
+    /ENOTFOUND/i,
+    /ETIMEDOUT/i,
+    /EAI_AGAIN/i,
+    /network error/i,
+    /TopologyClosed/i,
+    /ServerSelection/i,
+    /Could not connect to any servers/i
+  ];
+  return patterns.some(p => p.test(name) || p.test(msg));
 }
 
-// Handle post-connect disconnections -> allow new retries on demand
+function trimMsg(m) {
+  if (!m) return '';
+  return m.length > 180 ? m.slice(0, 177) + '...' : m;
+}
+
 mongoose.connection.on('disconnected', () => {
   console.warn('⚠️ MongoDB disconnected');
-  connectionPromise = null; // allow future reconnect attempts
+  connectionPromise = null;
 });
 
 mongoose.connection.on('reconnected', () => {
@@ -77,4 +109,3 @@ mongoose.connection.on('reconnected', () => {
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error event:', err.message);
 });
-
