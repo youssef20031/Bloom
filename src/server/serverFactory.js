@@ -9,10 +9,11 @@ import alertsRoutes from './routes/alerts.js';
 import invoiceRoutes from './routes/invoice.js';
 import productRoutes from './routes/product.js';
 import { setIo } from './socket.js';
+import { connectWithRetry } from './utils/mongo.js';
 
 export async function createTestServer(mongoUri) {
   if (mongoose.connection.readyState !== 1) {
-    await mongoose.connect(mongoUri);
+    await connectWithRetry(mongoUri, { maxRetries: 3, baseDelay: 200 });
   }
   const app = express();
   app.use(express.json());
@@ -43,4 +44,3 @@ export async function createTestServer(mongoUri) {
 
   return { app, server, io, port, close };
 }
-

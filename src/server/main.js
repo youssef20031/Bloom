@@ -16,7 +16,7 @@ import customerRoutes from "./routes/customer.js";
 import cors from "cors";
 import chatRoutes from "./routes/chatBot.js";
 import requestChangeRoutes from './routes/requestChange.js';
-
+import { connectWithRetry } from './utils/mongo.js'; // Added retryable connection
 
 dotenv.config();
 
@@ -43,10 +43,15 @@ app.use("/api/customers", customerRoutes);
 app.use("/api/support-ticket", supportTicketRoutes); // Use only /api/support-ticket for support tickets
 const MONGO_URI = process.env.MONGO_URI;
 
-mongoose.connect(MONGO_URI)
-    .then(() => console.log("Successfully connected to MongoDB"))
-    .catch(err => console.error("MongoDB connection error:", err));
-
+// Removed direct mongoose.connect; using retry logic instead
+(async () => {
+  try {
+    await connectWithRetry(MONGO_URI);
+  } catch (err) {
+    console.error('❌ Fatal: could not establish MongoDB connection after retries. Exiting.');
+    process.exit(1);
+  }
+})();
 
 app.get("/hello", (req, res) => {
   res.send("Hello Vite + React!");
