@@ -2,6 +2,11 @@
 import mongoose from 'mongoose';
 
 let connectionPromise = null;
+let lastUri = null;
+let lastOptions = null;
+let autoReconnectTimer = null;
+let autoReconnectAttempts = 0;
+let autoReconnectInFlight = false;
 
 // Read optional env overrides
 const envInt = (name, def) => {
@@ -15,6 +20,9 @@ export async function connectWithRetry(uri, options = {}) {
   if (!uri) throw new Error('MongoDB URI is required');
   if (mongoose.connection.readyState === 1) return mongoose.connection;
   if (connectionPromise) return connectionPromise;
+
+  lastUri = uri;
+  lastOptions = options;
 
   let maxRetries = options.maxRetries ?? envInt('MONGO_MAX_RETRIES', 5);
   const baseDelay = options.baseDelay ?? envInt('MONGO_RETRY_BASE_MS', 500); // ms
@@ -49,6 +57,7 @@ export async function connectWithRetry(uri, options = {}) {
       await connectionPromise;
       const ms = Date.now() - start;
       console.log(`✅ MongoDB connected after attempt ${attempt} in ${ms} ms`);
+      autoReconnectAttempts = 0; // reset auto reconnect backoff on success
       return mongoose.connection;
     } catch (err) {
       connectionPromise = null;
@@ -97,9 +106,46 @@ function trimMsg(m) {
   return m.length > 180 ? m.slice(0, 177) + '...' : m;
 }
 
+function scheduleAutoReconnect(reason) {
+  const enabled = (process.env.MONGO_AUTO_RECONNECT || 'true').toLowerCase() !== 'false';
+  if (!enabled) return;
+  if (!lastUri) return;
+  if (mongoose.connection.readyState === 1) return;
+  if (autoReconnectInFlight) return;
+
+  const maxAuto = envInt('MONGO_AUTO_RECONNECT_MAX_RETRIES', 0); // 0 = unlimited
+  if (maxAuto > 0 && autoReconnectAttempts >= maxAuto) {
+    console.error(`❌ Auto-reconnect abort: exceeded MONGO_AUTO_RECONNECT_MAX_RETRIES=${maxAuto}`);
+    return;
+  }
+  autoReconnectAttempts += 1;
+  const base = envInt('MONGO_AUTO_RECONNECT_BASE_MS', 1000);
+  const factor = Number(process.env.MONGO_AUTO_RECONNECT_FACTOR || 2);
+  const maxDelay = envInt('MONGO_AUTO_RECONNECT_MAX_DELAY_MS', 15000);
+  const attempt = autoReconnectAttempts;
+  const delay = Math.min(base * Math.pow(factor, attempt - 1), maxDelay);
+  console.warn(`🔁 Scheduling auto-reconnect attempt ${attempt} in ${delay} ms (reason=${reason})`);
+  clearTimeout(autoReconnectTimer);
+  autoReconnectTimer = setTimeout(async () => {
+    if (mongoose.connection.readyState === 1) return; // already connected meanwhile
+    autoReconnectInFlight = true;
+    try {
+      await connectWithRetry(lastUri, { ...lastOptions, maxRetries: lastOptions.maxRetries ?? envInt('MONGO_MAX_RETRIES', 5) });
+      console.log('✅ Auto-reconnect succeeded');
+    } catch (err) {
+      console.error(`❌ Auto-reconnect attempt ${attempt} failed: ${err.message}`);
+      autoReconnectInFlight = false; // allow another schedule
+      scheduleAutoReconnect('retry-failure');
+      return;
+    }
+    autoReconnectInFlight = false;
+  }, delay);
+}
+
 mongoose.connection.on('disconnected', () => {
   console.warn('⚠️ MongoDB disconnected');
   connectionPromise = null;
+  scheduleAutoReconnect('disconnected');
 });
 
 mongoose.connection.on('reconnected', () => {
@@ -108,4 +154,7 @@ mongoose.connection.on('reconnected', () => {
 
 mongoose.connection.on('error', (err) => {
   console.error('MongoDB connection error event:', err.message);
+  if (mongoose.connection.readyState !== 1) {
+    scheduleAutoReconnect('error');
+  }
 });
