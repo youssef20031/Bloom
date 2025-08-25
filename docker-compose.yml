@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  bloom:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+      - "5001:5001"
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongo:27017/bloom
+    depends_on:
+      - mongo
+    volumes:
+      - ./src:/app/src
+    restart: unless-stopped
+
+  bloom-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai
+    ports:
+      - "5002:5001"
+    environment:
+      - FLASK_ENV=production
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    restart: unless-stopped
+
+volumes:
+  mongo_data:
