@@ -41,6 +41,7 @@ app.use(express.urlencoded({ extended: true }));
 // Routes
 app.use("/api/customers", customerRoutes);
 app.use("/api/support-ticket", supportTicketRoutes); // Use only /api/support-ticket for support tickets
+app.use ("/api/request-change",requestChangeRoutes);
 const MONGO_URI = process.env.MONGO_URI;
 
 // Removed direct mongoose.connect; using retry logic instead
