@@ -181,7 +181,7 @@ export default function Dashboard() {
                         setCustomers(custRes.data || []);
                     }
                 }
-                if (currentView == "Request") {
+                if (currentView === "Request") {
                     const res = await api.get("/request-change");
                     if (mounted) {
                         setEntities(res.data || []);
