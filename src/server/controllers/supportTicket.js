@@ -5,7 +5,7 @@ import User from '../models/user.js';
 // Create a new support ticket
 export const createSupportTicket = async (req, res) => {
     try {
-        let { customerId, issue, priority = 'medium' } = req.body;
+        let { customerId, issue, priority = 'medium', status, createdAt } = req.body;
 
         if (!customerId || !issue) {
             return res.status(400).json({ message: 'Customer ID and issue description are required' });
@@ -21,12 +21,29 @@ export const createSupportTicket = async (req, res) => {
             customerId = customer._id;
         }
 
+        // Normalize status (optional override for seeding)
+        const allowedStatuses = ['open', 'in_progress', 'closed'];
+        if (!allowedStatuses.includes(status)) status = 'open';
+
+        // Support optional historical createdAt (for seeding). Accept ISO or DD/MM/YYYY.
+        let createdAtDate = new Date();
+        if (createdAt) {
+            if (/^\d{2}\/\d{2}\/\d{4}$/.test(createdAt)) {
+                const [dd, mm, yyyy] = createdAt.split('/').map(Number);
+                createdAtDate = new Date(yyyy, mm - 1, dd);
+            } else {
+                const parsed = new Date(createdAt);
+                if (!isNaN(parsed.getTime())) createdAtDate = parsed;
+            }
+        }
+
         const supportTicket = new SupportTicket({
             customerId,
             issue,
             priority,
-            status: 'open',
-            history: [{ message: `Ticket created: ${issue}`, author: customerId, timestamp: new Date() }]
+            status,
+            createdAt: createdAtDate,
+            history: [{ message: `Ticket created: ${issue}`, author: customerId, timestamp: createdAtDate }]
         });
 
         await supportTicket.save();

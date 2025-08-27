@@ -12,7 +12,9 @@
     "serve:ai": "python src/ai_service/ai_service.py",
     "install:ai": "pip install --no-cache-dir --break-system-packages -r src/ai_service/requirements.txt",
     "setup": "npm install && npm run install:ai",
-    "start:both": "npx concurrently \"npm run dev\" \"npm run serve:ai\""
+    "start:both": "npx concurrently \"npm run dev\" \"npm run serve:ai\"",
+    "seed:support:local": "node src/server/setupSupportDemoData.js",
+    "seed:support:remote": "node src/server/seedSupportTicketsRemote.js"
   },
   "dependencies": {
     "axios": "^1.11.0",
