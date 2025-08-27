@@ -42,6 +42,10 @@ export default function Login() {
         else if (userRole === 'it') {
           navigate('/it');
         }
+        else if(userRole === 'support')
+        {
+            navigate('/support');
+        }
         else {
             navigate('/');
         }
