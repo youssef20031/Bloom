@@ -1,5 +1,6 @@
 // API utility for support tickets
 const BASE_URL = '/api/support-ticket';
+const CHANGE_REQ_BASE = '/api/request-change';
 
 export async function listSupportTickets() {
   const res = await fetch(`${BASE_URL}/`);
@@ -61,7 +62,34 @@ export async function deleteSupportTicket(ticketId) {
   return res.json();
 }
 
-export async function submitChangeRequest(ticketId, tag, description, authorId) {
-  const message = `[Change Request]\nTag: ${tag}\nDescription: ${description || 'N/A'}`;
-  return addTicketMessage(ticketId, message, authorId);
+export async function submitChangeRequest(ticketId, tag, description, authorId, { addHistoryMessage = true } = {}) {
+  // Ensure tag matches backend enum (ai, dc)
+  const normalizedTag = (tag || '').toLowerCase();
+  if (!['ai', 'dc'].includes(normalizedTag)) {
+    throw new Error('Tag must be AI or DC');
+  }
+  // Create dedicated RequestChange document
+  const res = await fetch(`${CHANGE_REQ_BASE}/`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ supportTicketId: ticketId, tag: normalizedTag, description })
+  });
+  if (!res.ok) {
+    const errJson = await res.json().catch(()=>({}));
+    throw new Error(errJson.message || 'Failed to create change request');
+  }
+  const data = await res.json();
+
+  // Optionally also append a readable history message to the support ticket
+  if (addHistoryMessage) {
+    const safeDesc = description && description.trim() ? description : 'N/A';
+    const message = `[Change Request]\nTag: ${normalizedTag}\nDescription: ${safeDesc}\nRequestChangeId: ${data.requestChange?._id || ''}`;
+    try {
+      await addTicketMessage(ticketId, message, authorId);
+    } catch (e) {
+      // Non-fatal: surface a warning but still return the created change request
+      console.warn('Change Request created but failed to append ticket message:', e);
+    }
+  }
+  return data.requestChange;
 }
