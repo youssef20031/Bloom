@@ -31,6 +31,8 @@ export default function Services() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [expandedId, setExpandedId] = useState(null);
   const [expandedService, setExpandedService] = useState(null);
+  // Added: product id -> name map
+  const [productMap, setProductMap] = useState({});
 
   // Service selection state
   const [purchasedServiceIds, setPurchasedServiceIds] = useState([]);
@@ -101,6 +103,27 @@ export default function Services() {
     return () => { abort = true; };
   }, []);
 
+  // Fetch products once to build map (frontend-only resolution of names)
+  useEffect(() => {
+    let aborted = false;
+    const loadProducts = async () => {
+      try {
+        const res = await fetch('/api/products');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!aborted && Array.isArray(data)) {
+          const map = {};
+          data.forEach(pr => { if (pr && pr._id) map[pr._id] = pr.name || pr._id; });
+          setProductMap(map);
+        }
+      } catch { /* ignore */ }
+    };
+    loadProducts();
+    // Optionally refresh occasionally (names unlikely to change often)
+    const interval = setInterval(loadProducts, 5 * 60 * 1000);
+    return () => { aborted = true; clearInterval(interval); };
+  }, []);
+
   const filtered = useMemo(() => services.filter(s => {
     const matchesSearch = !search || s.name.toLowerCase().includes(search.toLowerCase()) || (s.description||'').toLowerCase().includes(search.toLowerCase());
     const matchesType = typeFilter === 'all' || s.type === typeFilter;
@@ -140,6 +163,19 @@ export default function Services() {
     }
   };
 
+  const getProductNames = (arr) => {
+    if (!Array.isArray(arr)) return [];
+    return arr.map(p => {
+      if (p && typeof p === 'object') {
+        if (p.name) return p.name; // In case future population occurs
+        if (p._id && productMap[p._id]) return productMap[p._id];
+        return p._id || '';
+      }
+      // p is assumed to be an ObjectId string
+      return productMap[p] || p; // fallback to id until map loads
+    }).filter(Boolean);
+  };
+
   const ServiceCard = ({ svc }) => {
     const isOpen = expandedId === svc._id; // drives chevron state & highlight
     const purchased = purchasedServiceIds.includes(svc._id);
@@ -162,6 +198,8 @@ export default function Services() {
       }
     };
 
+    const productNames = getProductNames(svc.associatedProducts);
+
     return (
       <div className={`group relative rounded-2xl border border-slate-200 bg-white/70 backdrop-blur-sm p-5 shadow-sm hover:shadow-md transition-all flex flex-col ${expandedService && expandedService._id===svc._id ? 'ring-2 ring-offset-2 ring-blue-500' : ''}`}>
         <div className="flex items-start gap-4">
@@ -172,8 +210,10 @@ export default function Services() {
             <h3 className="font-semibold text-slate-800 text-lg leading-tight truncate" title={svc.name}>{svc.name}</h3>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
               <span className={`px-2 py-0.5 rounded-full font-medium ${colors.pill}`}>{TYPE_LABEL[svc.type] || svc.type}</span>
-              {Array.isArray(svc.associatedProducts) && svc.associatedProducts.length > 0 && (
-                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1"><Package className="w-3 h-3" /> {svc.associatedProducts.length} products</span>
+              {productNames.length > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1" title={productNames.join(', ')}>
+                  <Package className="w-3 h-3" /> {productNames.slice(0,3).join(', ')}{productNames.length > 3 ? ` +${productNames.length - 3}` : ''}
+                </span>
               )}
             </div>
           </div>
@@ -220,7 +260,9 @@ export default function Services() {
               <div className="mt-2 flex flex-wrap gap-2 text-xs">
                 <span className={`px-2 py-0.5 rounded-full font-medium ${(TYPE_COLORS[svc.type]||{}).pill || 'bg-blue-100 text-blue-700'}`}>{TYPE_LABEL[svc.type] || svc.type}</span>
                 {Array.isArray(svc.associatedProducts) && svc.associatedProducts.length > 0 && (
-                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1"><Package className="w-3 h-3" /> {svc.associatedProducts.length} products</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 font-medium flex items-center gap-1" title={getProductNames(svc.associatedProducts).join(', ')}>
+                    <Package className="w-3 h-3" /> {getProductNames(svc.associatedProducts).slice(0,3).join(', ')}{getProductNames(svc.associatedProducts).length > 3 ? ` +${getProductNames(svc.associatedProducts).length - 3}` : ''}
+                  </span>
                 )}
               </div>
             </div>
@@ -243,7 +285,7 @@ export default function Services() {
             <section>
               <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500 mb-3">Associated Products</h3>
               <ul className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
-                {svc.associatedProducts.map((p,i)=>(<li key={i} className="px-3 py-2 rounded-md bg-slate-100 text-slate-700 text-xs font-medium truncate" title={p}>{p}</li>))}
+                {svc.associatedProducts.map((p,i)=>{ const name = getProductNames([p])[0]; return (<li key={i} className="px-3 py-2 rounded-md bg-slate-100 text-slate-700 text-xs font-medium truncate" title={name}>{name || 'Unknown Product'}</li>); })}
               </ul>
             </section>
           )}

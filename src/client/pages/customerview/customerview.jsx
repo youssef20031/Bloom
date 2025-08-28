@@ -19,6 +19,7 @@ export default function CustomerView({ initialSection = 'overview' }) {
     const [customerDbId, setCustomerDbId] = useState(null);
     const [stats, setStats] = useState({ totalAssets: 0, assetsByType: {}, averages: {}, alerts: {} });
     const [activeSection, setActiveSection] = useState(initialSection);
+    const [purchasedProducts, setPurchasedProducts] = useState([]); // store mapped purchased products with type & quantity
 
     // Support tickets view state (restored after regression)
     const [supportPage, setSupportPage] = useState(1);
@@ -129,17 +130,30 @@ export default function CustomerView({ initialSection = 'overview' }) {
                         ip: p.ipAddress,
                         subscriptionStatus: p.status,
                         datePurchased: p.purchaseDate,
-                        kind: 'service'
+                        kind: 'service',
+                        associatedProducts: (p.serviceId.associatedProducts || []).map(prod => ({
+                            id: prod._id,
+                            name: prod.name,
+                            type: prod.type,
+                            model: prod.model,
+                            vendor: prod.vendor
+                        }))
                     }));
                     setServices(mappedServices);
                     const productEntries = (data.purchasedProducts || []).map(p => ({
                         id: p.productId._id,
                         name: p.productId.name,
+                        type: p.productId.type,
                         datePurchased: p.purchaseDate,
                         status: p.status,
+                        quantity: p.quantity || 1,
                         kind: 'product'
                     }));
-                    setOrders([...mappedServices.map(s=>({id:s.id,name:s.name,datePurchased:s.datePurchased,status:s.subscriptionStatus,kind:'service'})), ...productEntries]);
+                    setPurchasedProducts(productEntries);
+                    setOrders([
+                        ...mappedServices.map(s => ({ id: s.id, name: s.name, datePurchased: s.datePurchased, status: s.subscriptionStatus, kind: 'service' })),
+                        ...productEntries.map(p => ({ id: p.id, name: p.name, datePurchased: p.datePurchased, status: p.status, kind: 'product' }))
+                    ]);
                 }
             } catch (err) { console.error('Error fetching services/orders', err); }
             try {
@@ -185,7 +199,6 @@ export default function CustomerView({ initialSection = 'overview' }) {
         const handleStorage = (e) => {
             if (e.key === 'servicesUpdated') {
                 if (userId) {
-                    // Re-run invoice + profile fetch (lightweight subset)
                     fetch(`/api/customers/profile/${userId}`).then(r=> r.ok ? r.json(): null).then(data => {
                         if (!data) return;
                         setCustomerDbId(data._id);
@@ -195,17 +208,30 @@ export default function CustomerView({ initialSection = 'overview' }) {
                             ip: p.ipAddress,
                             subscriptionStatus: p.status,
                             datePurchased: p.purchaseDate,
-                            kind: 'service'
+                            kind: 'service',
+                            associatedProducts: (p.serviceId.associatedProducts || []).map(prod => ({
+                                id: prod._id,
+                                name: prod.name,
+                                type: prod.type,
+                                model: prod.model,
+                                vendor: prod.vendor
+                            }))
                         }));
                         setServices(mappedServices);
                         const productEntries = (data.purchasedProducts || []).map(p => ({
                             id: p.productId._id,
                             name: p.productId.name,
+                            type: p.productId.type,
                             datePurchased: p.purchaseDate,
                             status: p.status,
+                            quantity: p.quantity || 1,
                             kind: 'product'
                         }));
-                        setOrders([...mappedServices.map(s=>({id:s.id,name:s.name,datePurchased:s.datePurchased,status:s.subscriptionStatus,kind:'service'})), ...productEntries]);
+                        setPurchasedProducts(productEntries);
+                        setOrders([
+                            ...mappedServices.map(s=>({id:s.id,name:s.name,datePurchased:s.datePurchased,status:s.subscriptionStatus,kind:'service'})),
+                            ...productEntries.map(p=>({id:p.id,name:p.name,datePurchased:p.datePurchased,status:p.status,kind:'product'}))
+                        ]);
                     }).catch(()=>{});
                     fetch('/api/invoices').then(r=> r.ok? r.json(): []).then(allInv => {
                         const filtered = (allInv || []).filter(inv => {
@@ -359,11 +385,11 @@ export default function CustomerView({ initialSection = 'overview' }) {
 
     const StatsGrid = () => (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-6">
-            <StatCard label="My Services" value={services.length || 0} icon={Briefcase} trend={0} trendDir="flat" iconBg="from-indigo-500 to-indigo-600" />
-            <StatCard label="Total Assets" value={stats.totalAssets || 0} icon={Database} trend={12} trendDir="up" iconBg="from-emerald-500 to-emerald-600" />
-            <StatCard label="Active Servers" value={stats.assetsByType.server || 0} icon={Server} trend={8} trendDir="up" iconBg="from-sky-500 to-sky-600" />
-            <StatCard label="Storage Devices" value={stats.assetsByType.storage || 0} icon={HardDrive} trend={2} trendDir={(stats.assetsByType.storage||0) >= 0 ? 'down' : 'up'} iconBg="from-purple-500 to-purple-600" />
-            <StatCard label="Active Alerts" value={stats.alerts.totalActive || 0} icon={AlertTriangle} trend={25} trendDir="flat" iconBg="from-rose-500 to-rose-600" />
+            <StatCard label="My Services" value={activeServicesCount} icon={Briefcase} trend={0} trendDir="flat" iconBg="from-indigo-500 to-indigo-600" />
+            <StatCard label="Total Assets" value={combinedTotalAssets} icon={Database} trend={12} trendDir="up" iconBg="from-emerald-500 to-emerald-600" />
+            <StatCard label="Active Servers" value={combinedActiveServers} icon={Server} trend={8} trendDir="up" iconBg="from-sky-500 to-sky-600" />
+            <StatCard label="Storage Devices" value={combinedStorageDevices} icon={HardDrive} trend={2} trendDir={combinedStorageDevices >= 0 ? 'down' : 'up'} iconBg="from-purple-500 to-purple-600" />
+            <StatCard label="Active Alerts" value={stats.alerts?.totalActive || 0} icon={AlertTriangle} trend={25} trendDir="flat" iconBg="from-rose-500 to-rose-600" />
         </div>
     );
 
@@ -734,6 +760,45 @@ export default function CustomerView({ initialSection = 'overview' }) {
             try { el.setSelectionRange(start, end); } catch {}
         }
     }, [ticketDescription]);
+
+    // Derived counts (frontend augmentation of backend stats)
+    // Helper to classify product types more robustly (case-insensitive + name heuristics)
+    const classifyProductType = (rawType, name) => {
+        const t = (rawType || '').toString().toLowerCase().trim();
+        const n = (name || '').toString().toLowerCase();
+        // Direct matches
+        if (t === 'server' || t === 'servers') return 'server';
+        if (t === 'storage' || t === 'storage-device' || t === 'disk') return 'storage';
+        // Heuristic by name keywords (extendable)
+        const serverHints = ['server', 'poweredge', 'r750', 'r760', 'r650', 'r660', 'compute'];
+        if (serverHints.some(h => t.includes(h) || n.includes(h))) return 'server';
+        const storageHints = ['storage', 'powerstore', 'powervault', 'unity', 'ecs', 'objectscale', 'scaleio', 'me5'];
+        if (storageHints.some(h => t.includes(h) || n.includes(h))) return 'storage';
+        return t || 'other';
+    };
+
+    const activeServicesCount = services.filter(s => (s.subscriptionStatus||'').toLowerCase()==='active').length;
+    const activeProductCounts = purchasedProducts.filter(p => (p.status||'').toLowerCase()==='active');
+    const activeProductsTotal = activeProductCounts.reduce((sum,p)=> sum + (p.quantity || 1), 0);
+
+    // Service-associated products (deduplicated by id) for active services
+    const activeAssociatedProductsRaw = services.filter(s => (s.subscriptionStatus||'').toLowerCase()==='active')
+        .flatMap(s => s.associatedProducts || []);
+    const activeAssociatedProductsMap = new Map(activeAssociatedProductsRaw.map(p => [p.id, p]));
+    const activeAssociatedProducts = Array.from(activeAssociatedProductsMap.values());
+
+    const activeServersFromServiceProducts = activeAssociatedProducts.filter(p => classifyProductType(p.type, p.name) === 'server').length;
+    const activeStorageFromServiceProducts = activeAssociatedProducts.filter(p => classifyProductType(p.type, p.name) === 'storage').length;
+
+    const activeServersFromProducts = activeProductCounts
+        .filter(p => classifyProductType(p.type, p.name) === 'server')
+        .reduce((sum,p)=> sum + (p.quantity||1),0);
+    const activeStorageFromProducts = activeProductCounts
+        .filter(p => classifyProductType(p.type, p.name) === 'storage')
+        .reduce((sum,p)=> sum + (p.quantity||1),0);
+    const combinedTotalAssets = (stats.totalAssets || 0) + activeServicesCount + activeProductsTotal + activeAssociatedProducts.length; // include associated products
+    const combinedActiveServers = (stats.assetsByType?.server || 0) + activeServersFromProducts + activeServersFromServiceProducts;
+    const combinedStorageDevices = (stats.assetsByType?.storage || 0) + activeStorageFromProducts + activeStorageFromServiceProducts;
 
     return (
         <div className="flex h-screen overflow-hidden">

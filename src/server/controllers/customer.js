@@ -114,7 +114,14 @@ export const getCustomerProfile = async (req, res) => {
         }
         const customer = await Customer.findOne({ userId: queryUserId })
             .populate('userId', 'email firstName lastName')
-            .populate('purchasedServices.serviceId', 'name description price')
+            .populate({
+                path: 'purchasedServices.serviceId',
+                select: 'name description price associatedProducts',
+                populate: {
+                    path: 'associatedProducts',
+                    select: 'name description price type model vendor'
+                }
+            })
             .populate('purchasedProducts.productId', 'name description price type model vendor'); // Populate purchased products
 
         if (!customer) {
