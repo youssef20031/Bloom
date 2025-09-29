@@ -1388,63 +1388,63 @@ export default function ITDashboard() {
 										<p className="text-blue-100 text-sm mt-1">Real-time sensor data from datacenter nodes</p>
 									</div>
 									
-									<div className="p-6">
+									<div className="p-6 md:p-8">
 										{/* Dynamic grid layout based on whether averages are shown */}
-										<div className={`grid gap-6 ${(iotReadings.esp1 || iotReadings.esp2) ? 'grid-cols-1 lg:grid-cols-3' : 'grid-cols-1 lg:grid-cols-2 justify-items-center max-w-4xl mx-auto'}`}>
+										<div className={`grid gap-6 md:gap-8 ${(iotReadings.esp1 || iotReadings.esp2) ? 'grid-cols-1 xl:grid-cols-3 lg:grid-cols-2' : 'grid-cols-1 lg:grid-cols-2 justify-items-center max-w-5xl mx-auto'}`}>
 											{/* Average Metrics Card */}
 											{(iotReadings.esp1 || iotReadings.esp2) && (
-												<div className="bg-gradient-to-br from-slate-50 to-green-50 rounded-lg border border-slate-200 p-5">
-													<div className="flex items-center justify-between mb-4">
+												<div className="bg-gradient-to-br from-slate-50 to-green-50 rounded-xl border border-slate-200 p-6 w-full max-w-lg">
+													<div className="flex items-center justify-between mb-6">
 														<div className="flex items-center">
-															<div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center mr-3">
-																<LayoutDashboard className="w-5 h-5 text-white" />
+															<div className="w-12 h-12 bg-green-500 rounded-xl flex items-center justify-center mr-4">
+																<LayoutDashboard className="w-6 h-6 text-white" />
 															</div>
 															<div>
-																<h4 className="font-semibold text-gray-800">Environment Avg</h4>
-																<p className="text-sm text-gray-500">Calculated Metrics</p>
+																<h4 className="font-semibold text-gray-800 text-lg">Environment Avg</h4>
+																<p className="text-sm text-gray-500 mt-1">Calculated Metrics</p>
 															</div>
 														</div>
-														<div className="w-3 h-3 rounded-full bg-blue-400 animate-pulse"></div>
+														<div className="w-4 h-4 rounded-full bg-blue-400 animate-pulse"></div>
 													</div>
 													
-													<div className="grid grid-cols-2 gap-4">
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Thermometer className="w-4 h-4 text-red-500 mr-2" />
+													<div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Thermometer className="w-5 h-5 text-red-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Temperature</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{iotAverages.temperature}°C</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{iotAverages.temperature}°C</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Droplet className="w-4 h-4 text-blue-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Droplet className="w-5 h-5 text-blue-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Humidity</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{iotAverages.humidity}%</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{iotAverages.humidity}%</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Flame className="w-4 h-4 text-orange-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Flame className="w-5 h-5 text-orange-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Smoke Level</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{iotAverages.smoke}</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{iotAverages.smoke}</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Zap className="w-4 h-4 text-purple-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Zap className="w-5 h-5 text-purple-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Power</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{iotAverages.power}V</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{iotAverages.power}V</div>
 														</div>
 													</div>
 													
 													{iotReadings.esp1 && !iotReadings.esp2 && (
-														<div className="text-xs text-gray-500 mt-3 text-center">
+														<div className="text-xs text-gray-500 mt-4 text-center">
 															* Based on ESP-01 data only
 														</div>
 													)}
 													{iotReadings.esp1 && iotReadings.esp2 && (
-														<div className="text-xs text-green-600 mt-3 text-center font-medium">
+														<div className="text-xs text-green-600 mt-4 text-center font-medium">
 															✓ Multi-node average active
 														</div>
 													)}
@@ -1452,127 +1452,127 @@ export default function ITDashboard() {
 											)}
 
 											{/* ESP1 Sensor Node */}
-											<div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-lg border border-slate-200 p-5 w-full max-w-md">
-												<div className="flex items-center justify-between mb-4">
+											<div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl border border-slate-200 p-6 w-full max-w-lg">
+												<div className="flex items-center justify-between mb-6">
 													<div className="flex items-center">
-														<div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center mr-3">
-															<Server className="w-5 h-5 text-white" />
+														<div className="w-12 h-12 bg-blue-500 rounded-xl flex items-center justify-center mr-4">
+															<Server className="w-6 h-6 text-white" />
 														</div>
 														<div>
-															<h4 className="font-semibold text-gray-800">Node ESP-01</h4>
-															<p className="text-sm text-gray-500">Primary Sensor</p>
+															<h4 className="font-semibold text-gray-800 text-lg">Node ESP-01</h4>
+															<p className="text-sm text-gray-500 mt-1">Primary Sensor</p>
 														</div>
 													</div>
-													<div className={`w-3 h-3 rounded-full ${iotReadings.esp1 ? 'bg-green-400 animate-pulse' : 'bg-gray-300'}`}></div>
+													<div className={`w-4 h-4 rounded-full ${iotReadings.esp1 ? 'bg-green-400 animate-pulse' : 'bg-gray-300'}`}></div>
 												</div>
 												
 												{iotReadings.esp1 ? (
-													<div className="grid grid-cols-2 gap-4">
-														<div className={`bg-white rounded-lg p-3 border ${
+													<div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+														<div className={`bg-white rounded-xl p-4 border ${
 															iotReadings.esp1.temperature >= SENSOR_THRESHOLDS.temperature.critical ? 'border-red-300 bg-red-50' :
 															iotReadings.esp1.temperature > SENSOR_THRESHOLDS.temperature.max ? 'border-yellow-300 bg-yellow-50' :
 															'border-gray-100'
-														}`}>
-															<div className="flex items-center mb-2">
-																<Thermometer className={`w-4 h-4 mr-2 ${
+														} shadow-sm transition-all duration-200 hover:shadow-md`}>
+															<div className="flex items-center mb-3">
+																<Thermometer className={`w-5 h-5 mr-3 ${
 																	iotReadings.esp1.temperature >= SENSOR_THRESHOLDS.temperature.critical ? 'text-red-600' :
 																	iotReadings.esp1.temperature > SENSOR_THRESHOLDS.temperature.max ? 'text-yellow-600' :
 																	'text-red-500'
 																}`} />
 																<span className="text-sm font-medium text-gray-600">Temperature</span>
 															</div>
-															<div className={`text-2xl font-bold ${
+															<div className={`text-2xl font-bold leading-tight ${
 																iotReadings.esp1.temperature >= SENSOR_THRESHOLDS.temperature.critical ? 'text-red-600' :
 																iotReadings.esp1.temperature > SENSOR_THRESHOLDS.temperature.max ? 'text-yellow-600' :
 																'text-gray-800'
 															}`}>{Number(iotReadings.esp1.temperature).toFixed(1)}°C</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Droplet className="w-4 h-4 text-blue-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Droplet className="w-5 h-5 text-blue-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Humidity</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp1.humidity).toFixed(1)}%</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{Number(iotReadings.esp1.humidity).toFixed(1)}%</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Flame className="w-4 h-4 text-orange-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Flame className="w-5 h-5 text-orange-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Smoke Level</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp1.smoke).toFixed(1)}</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{Number(iotReadings.esp1.smoke).toFixed(1)}</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Zap className="w-4 h-4 text-purple-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Zap className="w-5 h-5 text-purple-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Power</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp1.power).toFixed(1)}V</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{Number(iotReadings.esp1.power).toFixed(1)}V</div>
 														</div>
 													</div>
 												) : (
-													<div className="text-center py-8 text-gray-500">
-														<div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-															<Server className="w-6 h-6 text-gray-400" />
+													<div className="text-center py-12 text-gray-500">
+														<div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+															<Server className="w-8 h-8 text-gray-400" />
 														</div>
-														<p className="font-medium">Waiting for sensor data...</p>
-														<p className="text-sm mt-1">Node may be offline or initializing</p>
+														<p className="font-medium text-lg">Waiting for sensor data...</p>
+														<p className="text-sm mt-2">Node may be offline or initializing</p>
 													</div>
 												)}
 											</div>
 
 											{/* ESP2 Sensor Node */}
-											<div className="bg-gradient-to-br from-slate-50 to-purple-50 rounded-lg border border-slate-200 p-5 w-full max-w-md">
-												<div className="flex items-center justify-between mb-4">
+											<div className="bg-gradient-to-br from-slate-50 to-purple-50 rounded-xl border border-slate-200 p-6 w-full max-w-lg">
+												<div className="flex items-center justify-between mb-6">
 													<div className="flex items-center">
-														<div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center mr-3">
-															<Server className="w-5 h-5 text-white" />
+														<div className="w-12 h-12 bg-purple-500 rounded-xl flex items-center justify-center mr-4">
+															<Server className="w-6 h-6 text-white" />
 														</div>
 														<div>
-															<h4 className="font-semibold text-gray-800">Node ESP-02</h4>
-															<p className="text-sm text-gray-500">Secondary Sensor</p>
+															<h4 className="font-semibold text-gray-800 text-lg">Node ESP-02</h4>
+															<p className="text-sm text-gray-500 mt-1">Secondary Sensor</p>
 														</div>
 													</div>
-													<div className={`w-3 h-3 rounded-full ${iotReadings.esp2 ? 'bg-green-400 animate-pulse' : 'bg-gray-300'}`}></div>
+													<div className={`w-4 h-4 rounded-full ${iotReadings.esp2 ? 'bg-green-400 animate-pulse' : 'bg-gray-300'}`}></div>
 												</div>
 												
 												{iotReadings.esp2 ? (
-													<div className="grid grid-cols-2 gap-4">
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Thermometer className="w-4 h-4 text-red-500 mr-2" />
+													<div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Thermometer className="w-5 h-5 text-red-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Temperature</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp2.temperature).toFixed(1)}°C</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{Number(iotReadings.esp2.temperature).toFixed(1)}°C</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Droplet className="w-4 h-4 text-blue-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Droplet className="w-5 h-5 text-blue-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Humidity</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp2.humidity).toFixed(1)}%</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{Number(iotReadings.esp2.humidity).toFixed(1)}%</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Flame className="w-4 h-4 text-orange-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Flame className="w-5 h-5 text-orange-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Smoke Level</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp2.smoke).toFixed(1)}</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{Number(iotReadings.esp2.smoke).toFixed(1)}</div>
 														</div>
-														<div className="bg-white rounded-lg p-3 border border-gray-100">
-															<div className="flex items-center mb-2">
-																<Zap className="w-4 h-4 text-purple-500 mr-2" />
+														<div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm transition-all duration-200 hover:shadow-md">
+															<div className="flex items-center mb-3">
+																<Zap className="w-5 h-5 text-purple-500 mr-3" />
 																<span className="text-sm font-medium text-gray-600">Power</span>
 															</div>
-															<div className="text-2xl font-bold text-gray-800">{Number(iotReadings.esp2.power).toFixed(1)}V</div>
+															<div className="text-2xl font-bold text-gray-800 leading-tight">{Number(iotReadings.esp2.power).toFixed(1)}V</div>
 														</div>
 													</div>
 												) : (
-													<div className="text-center py-8 text-gray-500">
-														<div className="w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
-															<Server className="w-6 h-6 text-gray-400" />
+													<div className="text-center py-12 text-gray-500">
+														<div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+															<Server className="w-8 h-8 text-gray-400" />
 														</div>
-														<p className="font-medium">Waiting for sensor data...</p>
-														<p className="text-sm mt-1">Node may be offline or initializing</p>
+														<p className="font-medium text-lg">Waiting for sensor data...</p>
+														<p className="text-sm mt-2">Node may be offline or initializing</p>
 													</div>
 												)}
 											</div>
